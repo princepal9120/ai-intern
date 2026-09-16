@@ -1,0 +1,36 @@
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/configuration-schema.json",
+  "name": "ai-intern",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "404-page",
+  },
+  "vars": {
+    "GATEWAY_ID": "default",
+    "ORCHESTRATOR_MODEL": "@cf/meta/llama-3.1-8b-instruct",
+    "CODING_MODEL": "google/gemini-2.0-flash",
+    "RUNTIME": "sandbox",
+  },
+  "ai": {
+    "binding": "AI",
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "CodingOrchestrator", "class_name": "CodingOrchestrator" },
+      { "name": "OpenCodeAgent", "class_name": "OpenCodeAgent" },
+      { "name": "Sandbox", "class_name": "Sandbox" },
+    ],
+  },
+  "containers": [
+    {
+      "class_name": "Sandbox",
+      "name": "ai-intern-sandbox",
+      "image": "./Dockerfile",
+      "max_instances": 3,
+    },
+  ],
+  "migrations": [{ "tag": "v1", "new_classes": ["CodingOrchestrator", "OpenCodeAgent", "Sandbox"] }],
+}

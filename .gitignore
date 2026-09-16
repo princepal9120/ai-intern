@@ -1,0 +1,11 @@
+node_modules/
+public/
+dist/
+.wrangler/
+.dev.vars
+wrangler-devenv.json
+.omx/
+.omc/
+
+.astro/
+.vitest/

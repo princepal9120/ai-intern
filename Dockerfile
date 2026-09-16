@@ -1,21 +1,10 @@
-FROM python:3.12-slim
+// Pinned to the @cloudflare/sandbox npm version in package.json (0.12.9).
+// The "-opencode" variant ships the sandbox container server plus git,
+// node, and micellaneous dev tools. We pin opencode-ai on top so the exact
+// CLI version is deterministic regardless of what the base image baked in.
+FROM docker.io/cloudflare/sandbox:0.12.9-opencode
 
-WORKDIR /app
+RUN npm i -g opencode-ai@1.18.31 \
+  && opencode --version
 
-# Install system deps
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    gh \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY src/ ./src/
-
-WORKDIR /app/src
-
-EXPOSE 8000
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+EXPOSE 4096
