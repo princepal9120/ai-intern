@@ -16,6 +16,7 @@ export const MAX_FILE_CHARS = 100_000;
 export const MAX_TOTAL_FILE_CHARS = 500_000;
 export const OPENCODE_TIMEOUT_MS = 15 * 60 * 1000;
 export const GIT_TIMEOUT_MS = 5 * 60 * 1000;
+export const MAX_PROGRESS_EVENTS = 256;
 
 export interface ExecResult {
   stdout: string;
@@ -28,9 +29,17 @@ export interface SandboxOps {
   writeFile(path: string, content: string): Promise<void>;
   exec(
     command: string,
-    opts?: { cwd?: string; timeoutMs?: number; env?: Record<string, string>; signal?: AbortSignal },
+    opts?: {
+      cwd?: string;
+      timeoutMs?: number;
+      env?: Record<string, string>;
+      signal?: AbortSignal;
+      onOutput?: (stream: "stdout" | "stderr", data: string) => void;
+    },
   ): Promise<ExecResult>;
-  readFile(path: string): Promise<{ kind: "utf8"; content: string } | { kind: "base64"; content: string }>;
+  readFile(path: string, opts?: { maxBytes?: number; signal?: AbortSignal }): Promise<
+    { kind: "utf8"; content: string } | { kind: "base64"; content: string }
+  >;
 }
 
 export interface ProgressEvent {
@@ -88,21 +97,27 @@ export class SandboxRuntimeAdapter implements RuntimeAdapter {
     throwIfAborted(opts?.signal);
     const argv = buildOpencodeArgv(input, workdir);
     let run: ExecResult;
+    const output = streamProgress(emit, opts?.signal);
     try {
       run = await ops.exec(shellJoin(argv), {
         cwd: workdir,
         timeoutMs: OPENCODE_TIMEOUT_MS,
         signal: opts?.signal,
+        onOutput: output.onData,
         env: {
           OPENCODE_CONFIG: configPath,
           OPENCODE_DISABLE_AUTOUPDATE: "true",
           GOOGLE_GENERATIVE_AI_API_KEY: DUMMY_PROVIDER_KEY,
         },
       });
+      await output.finish();
+      throwIfAborted(opts?.signal);
     } catch (error) {
+      await output.finish();
+      throwIfAborted(opts?.signal);
       return failureResult(`OpenCode execution failed: ${shortError(error)}`, 0, "");
     }
-    const stderrTail = boundTail(run.stderr, MAX_STDERR_TAIL_CHARS);
+    const stderrTail = redactSecrets(boundTail(run.stderr, MAX_STDERR_TAIL_CHARS));
     if (run.exitCode !== 0) {
       return failureResult(
         `OpenCode exited with code ${run.exitCode}.`,
@@ -169,6 +184,89 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) {
     throw new Error("Run cancelled.");
   }
+}
+
+/** Thrown when a streamed OpenCode event line is malformed. */
+export class OpenCodeEventError extends Error {}
+
+/**
+ * Parse one `--format json` event line into progress text. OpenCode emits
+ * newline-delimited JSON; anything else is surfaced as an honest error.
+ */
+export function parseOpencodeEvent(line: string): string | null {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+  let event: unknown;
+  try {
+    event = JSON.parse(trimmed);
+  } catch {
+    throw new OpenCodeEventError(`Unparseable OpenCode event: ${boundTail(trimmed, 200)}`);
+  }
+  if (event === null || typeof event !== "object" || Array.isArray(event)) {
+    throw new OpenCodeEventError("OpenCode event is not an object.");
+  }
+  const record = event as Record<string, unknown>;
+  if (record.type === "error") {
+    const detail = typeof record.message === "string" ? record.message : JSON.stringify(record);
+    throw new OpenCodeEventError(`OpenCode error event: ${boundTail(detail, 500)}`);
+  }
+  const part = record.part ?? record.parts;
+  const text = typeof part === "string" ? part : summarizeUnknown(record);
+  return boundTail(text.trim() || summarizeUnknown(record), 500);
+}
+
+function summarizeUnknown(record: Record<string, unknown>): string {
+  const type = typeof record.type === "string" ? record.type : "event";
+  const keys = Object.keys(record).filter((key) => key !== "type" && key !== "part").slice(0, 6);
+  return keys.length ? `${type} (${keys.join(", ")})` : type;
+}
+
+interface OutputStream {
+  onData: (stream: "stdout" | "stderr", data: string) => void;
+  finish: () => Promise<void>;
+}
+
+/**
+ * Bridge exec output into progress events. Bounded: at most 256 events are
+ * emitted per run, stdout lines drive progress and stderr is only counted.
+ */
+function streamProgress(emit: ProgressEmitter, signal?: AbortSignal): OutputStream {
+  let buffer = "";
+  let emitted = 0;
+  let pending: Promise<void> = Promise.resolve();
+  const emitText = (text: string) => {
+    if (emitted >= MAX_PROGRESS_EVENTS) return;
+    emitted += 1;
+    pending = pending.then(() =>
+      emit({
+        phase: "code",
+        message: text,
+        fraction: Math.min(0.25 + emitted * 0.05, 0.8),
+      }),
+    );
+  };
+  return {
+    onData(stream, data) {
+      if (stream !== "stdout") return;
+      buffer += data;
+      for (;;) {
+        const newline = buffer.indexOf("\n");
+        if (newline < 0) break;
+        const line = buffer.slice(0, newline);
+        buffer = buffer.slice(newline + 1);
+        try {
+          const text = parseOpencodeEvent(line);
+          if (text) emitText(`[opencode] ${text}`);
+        } catch {
+          emitText("[opencode] malformed event line (redacted).");
+        }
+      }
+    },
+    async finish() {
+      buffer = "";
+      await pending;
+    },
+  };
 }
 
 /**
@@ -282,16 +380,19 @@ async function collectChanges(ops: SandboxOps, workdir: string, signal?: AbortSi
   for (const path of changedFiles) {
     if (totalChars >= MAX_TOTAL_FILE_CHARS) break;
     const fullPath = `${workdir}/${path}`;
-    const read = await ops.readFile(fullPath);
+    // The ops layer enforces maxBytes and throws instead of truncating, so a
+    // captured file is always complete or the whole run reports the error.
+    const read = await ops.readFile(fullPath, {
+      maxBytes: MAX_FILE_CHARS,
+      signal,
+    });
+    const content = read.content;
     if (read.kind === "utf8") {
-      const content = read.content.slice(0, MAX_FILE_CHARS);
       totalChars += content.length;
-      files.push({ path, content, encoding: "utf8" });
     } else {
-      const content = read.content.slice(0, MAX_FILE_CHARS);
-      totalChars += content.length;
-      files.push({ path, content, encoding: "base64" });
+      totalChars += Math.ceil(content.length * 3 / 4);
     }
+    files.push({ path, content, encoding: read.kind });
   }
   return { changedFiles, diff, files };
 }

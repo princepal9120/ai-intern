@@ -44,6 +44,8 @@ export function createSandboxOps(env: Env, sandboxId: string): SandboxOps {
         timeout: opts?.timeoutMs,
         env: opts?.env,
         signal: opts?.signal,
+        stream: opts?.onOutput !== undefined,
+        onOutput: opts?.onOutput,
       });
       return {
         stdout: result.stdout ?? "",
@@ -51,9 +53,10 @@ export function createSandboxOps(env: Env, sandboxId: string): SandboxOps {
         exitCode: result.exitCode ?? 0,
       };
     },
-    async readFile(path) {
+    async readFile(path, opts) {
+      opts?.signal?.throwIfAborted();
       const stream = await sandbox.readFileStream(path);
-      const bytes = await collectStream(stream);
+      const bytes = await collectStream(stream, opts?.maxBytes, opts?.signal);
       const decoded = tryDecodeUtf8(bytes);
       if (decoded !== null) {
         return { kind: "utf8", content: decoded };
@@ -63,18 +66,20 @@ export function createSandboxOps(env: Env, sandboxId: string): SandboxOps {
   };
 }
 
-async function collectStream(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
-  const reader = stream.getReader();
+async function collectStream(stream: ReadableStream<Uint8Array>, maxBytes = 500_000, signal?: AbortSignal): Promise<Uint8Array> {
   const chunks: Uint8Array[] = [];
   let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value) {
-      chunks.push(value);
-      total += value.length;
-    }
+  // The pipe interrupts a stalled read as well as cancelling the SDK stream.
+  const source = signal ? stream.pipeThrough(new TransformStream<Uint8Array, Uint8Array>(), { signal }) : stream;
+  // readFileStream is SSE, not raw file bytes. Decode before collecting.
+  for await (const chunk of streamFile(source)) {
+    signal?.throwIfAborted();
+    const bytes = typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk;
+    total += bytes.length;
+    if (total > maxBytes) throw new Error(`Captured file exceeds the ${maxBytes}-byte limit.`);
+    chunks.push(bytes);
   }
+  signal?.throwIfAborted();
   const out = new Uint8Array(total);
   let offset = 0;
   for (const chunk of chunks) {

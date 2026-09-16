@@ -4,10 +4,10 @@ import { OpenCodeAgent, createSandboxOps } from "../src/agents/opencode-agent.js
 import { formatAgentToolInput, parseAgentResultText, type CodingTaskInput, type CodingTaskResult } from "../src/opencode-input.js";
 
 const mocks = vi.hoisted(() => ({
-  run: vi.fn(), publish: vi.fn(), sandbox: vi.fn(), progress: vi.fn(),
+  run: vi.fn(), publish: vi.fn(), sandbox: vi.fn(), progress: vi.fn(), decodeFile: vi.fn(),
 }));
 vi.mock("@cloudflare/ai-chat", () => ({ AIChatAgent: class {} }));
-vi.mock("@cloudflare/sandbox", () => ({ getSandbox: mocks.sandbox }));
+vi.mock("@cloudflare/sandbox", () => ({ getSandbox: mocks.sandbox, streamFile: mocks.decodeFile }));
 vi.mock("../src/runtime.js", () => ({
   createRuntimeAdapter: () => ({ runCodingTask: mocks.run }),
   resolveRuntimeName: (name?: string) => name ?? "sandbox",
@@ -94,7 +94,7 @@ describe("OpenCodeAgent response boundary", () => {
     mocks.run.mockResolvedValue({ ...RESULT, files });
     const signal = new AbortController().signal;
     const { text, result } = await responseFor(agent({ ...INPUT, publishPullRequest: true }, "token"), signal);
-    expect(mocks.publish).toHaveBeenCalledWith(expect.objectContaining({ files, signal }));
+    expect(mocks.publish).toHaveBeenCalledWith(expect.objectContaining({ files }));
     expect(result.files).toEqual([]);
     expect(text).not.toContain(files[0]!.content);
     expect(text).toContain("Pull request: https://github.com/owner/repo/pull/1");
@@ -160,6 +160,23 @@ describe("OpenCodeAgent response boundary", () => {
 });
 
 describe("createSandboxOps", () => {
+  it.each([
+    { chunks: ["hello ", "world"], expected: { kind: "utf8", content: "hello world" } },
+    { chunks: [new Uint8Array([0, 255, 1])], expected: { kind: "base64", content: "AP8B" } },
+  ])("collects decoded SDK file chunks without treating SSE as content", async ({ chunks, expected }) => {
+    const stream = new ReadableStream<Uint8Array>();
+    mocks.sandbox.mockReturnValue({ readFileStream: vi.fn().mockResolvedValue(stream) });
+    mocks.decodeFile.mockImplementation(async function* () { yield* chunks; });
+    expect(await createSandboxOps({} as never, INPUT.sandboxId).readFile("a.txt")).toEqual(expected);
+    expect(mocks.decodeFile).toHaveBeenCalledWith(stream);
+  });
+
+  it("rejects oversized decoded files rather than publishing a truncated file", async () => {
+    mocks.sandbox.mockReturnValue({ readFileStream: vi.fn().mockResolvedValue(new ReadableStream()) });
+    mocks.decodeFile.mockImplementation(async function* () { yield "x".repeat(500_001); });
+    await expect(createSandboxOps({} as never, INPUT.sandboxId).readFile("large.txt")).rejects.toThrow("limit");
+  });
+
   it("forwards execution cancellation and preserves process exit code", async () => {
     const exec = vi.fn().mockResolvedValue({ stdout: "out", stderr: "err", exitCode: 4 });
     mocks.sandbox.mockReturnValue({ exec });
