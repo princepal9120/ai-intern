@@ -8,10 +8,10 @@ async function walk(dir) {
   return (await Promise.all(entries.map(entry => entry.isDirectory()
     ? walk(join(dir, entry.name)) : [join(dir, entry.name)]))).flat();
 }
-const files = await walk(join(root, "docs"));
+const files = await walk(root);
 const pages = files.filter(file => file.endsWith(".html"));
 assert(pages.length >= 15, "Expected all documentation pages and a 404 page");
-for (const path of ["index.html", "404.html", "docs/index.html", "docs/404.html", "docs/pagefind/pagefind.js"]) {
+for (const path of ["index.html", "404.html", "docs/overview/index.html", "pagefind/pagefind.js", "app/index.html"]) {
   assert((await stat(join(root, path))).isFile(), "Missing output: " + path);
 }
 let links = 0;
