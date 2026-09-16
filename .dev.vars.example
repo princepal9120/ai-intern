@@ -1,0 +1,16 @@
+# Copy to .dev.vars for local development. Never commit real credentials.
+# Non-secret defaults are in wrangler.jsonc.
+
+# Required by the current orchestrator, but its callback is disabled (503)
+# until authenticated Sandbox egress integration is implemented.
+# WORKER_ORIGIN=https://your-protected-test-worker.example.com
+
+# Optional, Worker-side PR publishing only. Private cloning is not wired.
+# GITHUB_TOKEN=
+
+# Optional, HMAC verification of acknowledgment-only GitHub webhooks.
+# GITHUB_WEBHOOK_SECRET=
+
+# AI Gateway uses the AI binding and GATEWAY_ID, not a container provider key.
+# CF_ACCOUNT_ID and AI_GATEWAY_TOKEN are legacy fields, not used by the helper.
+
