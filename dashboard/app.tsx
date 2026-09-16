@@ -184,6 +184,18 @@ export function App(): React.JSX.Element {
         setNotice("Enter a repository URL and a task first.");
         return;
       }
+      // Without a live agent connection sendMessage resolves silently, so the
+      // task would vanish as if it had been accepted.
+      if (agent.connectionError || !agent.identified) {
+        setNotice(
+          `Task not sent: ${
+            agent.connectionError
+              ? `connection error: ${agent.connectionError.message ?? "unknown"}`
+              : "still connecting to the orchestrator"
+          }.`,
+        );
+        return;
+      }
       setNotice(null);
       const branch = baseBranch.trim() || "main";
       const text = [
@@ -210,7 +222,7 @@ export function App(): React.JSX.Element {
         setSubmitting(false);
       }
     },
-    [repoUrl, baseBranch, task, publishPullRequest, chat, refreshRuns],
+    [repoUrl, baseBranch, task, publishPullRequest, chat, agent, refreshRuns],
   );
 
   const clearAll = useCallback(async () => {
