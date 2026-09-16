@@ -1,12 +1,15 @@
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  root: "client",
+  root: "dashboard",
   build: {
     outDir: "../public",
     emptyOutDir: true,
     target: "es2022",
     sourcemap: false,
+    rolldownOptions: {
+      input: ["dashboard/app/index.html"],
+    },
   },
   esbuild: {
     jsx: "automatic",
