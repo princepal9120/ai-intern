@@ -307,6 +307,133 @@ describe("sandbox HTTPS egress", () => {
   });
 });
 
+describe("streamed opencode progress", () => {
+  it("emits bounded progress from streamed stdout JSON events", async () => {
+    const ops = makeFakeOps();
+    const events: string[] = [];
+    ops.exec = async (command, opts) => {
+      execs: for (const line of [
+        JSON.stringify({ type: "step-start", part: "reading src/a.ts" }),
+        "not json at all",
+        JSON.stringify({ type: "step-finish" }),
+      ]) {
+        opts?.onOutput?.("stdout", `${line}\n`);
+      }
+      void execs;
+      return { stdout: "", stderr: "", exitCode: 0 };
+    };
+    const adapter = new SandboxRuntimeAdapter();
+    const result = await adapter.runCodingTask(ops, INPUT, (event) => {
+      if (event.phase === "code") events.push(event.message);
+    });
+    expect(result.status).toBe("completed");
+    expect(events.length).toBe(3);
+    expect(events[0]).toContain("reading src/a.ts");
+    expect(events[1]).toContain("malformed event line (redacted)");
+    expect(events[2]).not.toContain("undefined");
+  });
+
+  it("surfaces an opencode error event instead of pretending success", async () => {
+    const ops = makeFakeOps();
+    ops.exec = async (_command, opts) => {
+      opts?.onOutput?.("stdout", `${JSON.stringify({ type: "error", message: "quota exhausted" })}\n`);
+      return { stdout: "", stderr: "", exitCode: 0 };
+    };
+    const adapter = new SandboxRuntimeAdapter();
+    const result = await adapter.runCodingTask(ops, INPUT, () => {});
+    expect(result.status).toBe("error");
+    expect(result.summary).toContain("quota exhausted");
+  });
+
+  it("caps progress events so a chatty run cannot flood the stream", async () => {
+    const ops = makeFakeOps();
+    ops.exec = async (_command, opts) => {
+      for (let i = 0; i < 5000; i += 1) {
+        opts?.onOutput?.("stdout", `${JSON.stringify({ type: "log", part: `line ${i}` })}\n`);
+      }
+      return { stdout: "", stderr: "", exitCode: 0 };
+    };
+    const events: ProgressEvent[] = [];
+    const adapter = new SandboxRuntimeAdapter();
+    const result = await adapter.runCodingTask(ops, INPUT, (event) => events.push(event));
+    expect(result.status).toBe("completed");
+    const codeEvents = events.filter((event) => event.phase === "code");
+    expect(codeEvents.length).toBe(MAX_PROGRESS_EVENTS);
+  });
+
+  it("redacts secrets from the stderr tail", async () => {
+    const ops = makeFakeOps({
+      async exec() {
+        return { stdout: "", stderr: "boom AI_GATEWAY_TOKEN=real-secret-value", exitCode: 0 };
+      },
+    });
+    const adapter = new SandboxRuntimeAdapter();
+    const result = await adapter.runCodingTask(ops, INPUT, () => {});
+    expect(result.status).toBe("completed");
+    expect(result.stderrTail).not.toContain("real-secret-value");
+  });
+});
+
+describe("complete file collection bounds", () => {
+  it("passes per-file maxBytes and cancellation signal to readFile", async () => {
+    const ops = makeFakeOps();
+    const calls: Array<{ path: string; opts?: { maxBytes?: number; signal?: AbortSignal } }> = [];
+    ops.readFile = async (path, opts) => {
+      calls.push({ path, opts });
+      return { kind: "utf8", content: "file content" };
+    };
+    const controller = new AbortController();
+    const adapter = new SandboxRuntimeAdapter();
+    const result = await adapter.runCodingTask(ops, INPUT, () => {}, { signal: controller.signal });
+    expect(result.status).toBe("completed");
+    expect(calls).toHaveLength(2);
+    for (const call of calls) {
+      expect(call.opts?.maxBytes).toBe(MAX_FILE_CHARS);
+      expect(call.opts?.signal).toBe(controller.signal);
+    }
+  });
+
+  it("fails the whole run when a file exceeds its bound instead of truncating", async () => {
+    const ops = makeFakeOps({
+      async readFile(_path, opts) {
+        if ((opts?.maxBytes ?? 0) < 1_000_000) {
+          throw new Error("readFile exceeded maxBytes: never truncating captured file content.");
+        }
+        return { kind: "utf8", content: "file content" };
+      },
+    });
+    const adapter = new SandboxRuntimeAdapter();
+    const result = await adapter.runCodingTask(ops, INPUT, () => {});
+    expect(result.status).toBe("error");
+    expect(result.summary).toContain("maxBytes");
+    expect(result.files).toHaveLength(0);
+  });
+
+  it("counts deleted files without reading them", async () => {
+    const ops = makeFakeOps();
+    const reads: string[] = [];
+    ops.exec = async (command, opts) => {
+      if (command.includes("opencode")) {
+        opts?.onOutput?.("stdout", "");
+        return { stdout: "", stderr: "", exitCode: 0 };
+      }
+      if (command.includes("status")) {
+        return { stdout: " D src/deleted.ts\n M src/a.ts\n", stderr: "", exitCode: 0 };
+      }
+      return { stdout: "", stderr: "", exitCode: 0 };
+    };
+    ops.readFile = async (path) => {
+      reads.push(path);
+      return { kind: "utf8", content: "content" };
+    };
+    const adapter = new SandboxRuntimeAdapter();
+    const result = await adapter.runCodingTask(ops, INPUT, () => {});
+    expect(result.changedFiles).toEqual(["src/deleted.ts", "src/a.ts"]);
+    expect(reads).toEqual(["/workspace/run-abcdef12345678/src/a.ts"]);
+    expect(result.files).toHaveLength(1);
+  });
+});
+
 describe("runtime seam", () => {
   it("defaults to sandbox and rejects unknown runtimes", () => {
     expect(resolveRuntimeName(undefined)).toBe("sandbox");
