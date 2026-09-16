@@ -13,6 +13,8 @@ import type { CodingTaskInput } from "../src/opencode-input.js";
 import {
   COMPUTER_PREVIEW_MESSAGE,
   ComputerPreviewAdapter,
+  MAX_FILE_CHARS,
+  MAX_PROGRESS_EVENTS,
   SandboxRuntimeAdapter,
   buildOpencodeArgv,
   buildOpencodeConfig,
@@ -311,15 +313,14 @@ describe("streamed opencode progress", () => {
   it("emits bounded progress from streamed stdout JSON events", async () => {
     const ops = makeFakeOps();
     const events: string[] = [];
-    ops.exec = async (command, opts) => {
-      execs: for (const line of [
+    ops.exec = async (_command, opts) => {
+      for (const line of [
         JSON.stringify({ type: "step-start", part: "reading src/a.ts" }),
         "not json at all",
         JSON.stringify({ type: "step-finish" }),
       ]) {
         opts?.onOutput?.("stdout", `${line}\n`);
       }
-      void execs;
       return { stdout: "", stderr: "", exitCode: 0 };
     };
     const adapter = new SandboxRuntimeAdapter();
@@ -355,7 +356,9 @@ describe("streamed opencode progress", () => {
     };
     const events: ProgressEvent[] = [];
     const adapter = new SandboxRuntimeAdapter();
-    const result = await adapter.runCodingTask(ops, INPUT, (event) => events.push(event));
+    const result = await adapter.runCodingTask(ops, INPUT, (event) => {
+      events.push(event);
+    });
     expect(result.status).toBe("completed");
     const codeEvents = events.filter((event) => event.phase === "code");
     expect(codeEvents.length).toBe(MAX_PROGRESS_EVENTS);

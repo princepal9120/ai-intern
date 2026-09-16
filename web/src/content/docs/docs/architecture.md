@@ -32,7 +32,7 @@ The parent uses Workers AI for planning. Real model-provider and GitHub credenti
 | src/provider-gateway.ts | Server-side provider forwarding |
 | src/github.ts | GitHub REST publication |
 | src/runs.ts and src/transcript.ts | State and transcript helpers |
-| client/main.tsx and client/app.tsx | Mounted dashboard |
+| dashboard/main.tsx and dashboard/app.tsx | Mounted dashboard |
 | docs/ and scripts/ | Static documentation and build checks |
 
 No D1, KV, Queues, R2, Postgres, Redis, or separate frontend service is required. State resides in Agents/Sandbox Durable Objects.

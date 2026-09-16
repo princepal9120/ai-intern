@@ -38,7 +38,7 @@ vi.mock("ai", () => ({
     typeof part.type === "string" && part.type.startsWith("tool-"),
 }));
 
-import { App } from "../client/app";
+import { App } from "../dashboard/app";
 
 afterEach(() => {
   mocks.chat.messages = [];

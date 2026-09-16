@@ -93,7 +93,6 @@ export class SandboxRuntimeAdapter implements RuntimeAdapter {
       return failureResult(`Config write failed: ${shortError(error)}`, 0, "");
     }
 
-    await emit({ phase: "code", message: "Running OpenCode headlessly.", fraction: 0.25 });
     throwIfAborted(opts?.signal);
     const argv = buildOpencodeArgv(input, workdir);
     let run: ExecResult;
@@ -112,12 +111,19 @@ export class SandboxRuntimeAdapter implements RuntimeAdapter {
       });
       await output.finish();
       throwIfAborted(opts?.signal);
+      if (output.emittedCount() === 0) {
+        await emit({ phase: "code", message: "Ran OpenCode headlessly.", fraction: 0.8 });
+      }
     } catch (error) {
       await output.finish();
       throwIfAborted(opts?.signal);
       return failureResult(`OpenCode execution failed: ${shortError(error)}`, 0, "");
     }
     const stderrTail = redactSecrets(boundTail(run.stderr, MAX_STDERR_TAIL_CHARS));
+    const fatal = output.fatalError();
+    if (fatal !== null) {
+      return failureResult(fatal, run.exitCode, stderrTail);
+    }
     if (run.exitCode !== 0) {
       return failureResult(
         `OpenCode exited with code ${run.exitCode}.`,
@@ -189,6 +195,9 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
 /** Thrown when a streamed OpenCode event line is malformed. */
 export class OpenCodeEventError extends Error {}
 
+/** Thrown when OpenCode itself reports an error event; the run must fail. */
+export class OpenCodeFatalEventError extends OpenCodeEventError {}
+
 /**
  * Parse one `--format json` event line into progress text. OpenCode emits
  * newline-delimited JSON; anything else is surfaced as an honest error.
@@ -208,7 +217,7 @@ export function parseOpencodeEvent(line: string): string | null {
   const record = event as Record<string, unknown>;
   if (record.type === "error") {
     const detail = typeof record.message === "string" ? record.message : JSON.stringify(record);
-    throw new OpenCodeEventError(`OpenCode error event: ${boundTail(detail, 500)}`);
+    throw new OpenCodeFatalEventError(`OpenCode error event: ${boundTail(detail, 500)}`);
   }
   const part = record.part ?? record.parts;
   const text = typeof part === "string" ? part : summarizeUnknown(record);
@@ -224,18 +233,22 @@ function summarizeUnknown(record: Record<string, unknown>): string {
 interface OutputStream {
   onData: (stream: "stdout" | "stderr", data: string) => void;
   finish: () => Promise<void>;
+  fatalError: () => string | null;
+  emittedCount: () => number;
 }
 
 /**
- * Bridge exec output into progress events. Bounded: at most 256 events are
- * emitted per run, stdout lines drive progress and stderr is only counted.
+ * Bridge exec output into progress events. Bounded: at most
+ * MAX_PROGRESS_EVENTS events are emitted per run; stdout lines drive
+ * progress and stderr is ignored here because it is tailed separately.
  */
 function streamProgress(emit: ProgressEmitter, signal?: AbortSignal): OutputStream {
   let buffer = "";
   let emitted = 0;
+  let fatal: string | null = null;
   let pending: Promise<void> = Promise.resolve();
   const emitText = (text: string) => {
-    if (emitted >= MAX_PROGRESS_EVENTS) return;
+    if (signal?.aborted || emitted >= MAX_PROGRESS_EVENTS) return;
     emitted += 1;
     pending = pending.then(() =>
       emit({
@@ -257,14 +270,24 @@ function streamProgress(emit: ProgressEmitter, signal?: AbortSignal): OutputStre
         try {
           const text = parseOpencodeEvent(line);
           if (text) emitText(`[opencode] ${text}`);
-        } catch {
-          emitText("[opencode] malformed event line (redacted).");
+        } catch (error) {
+          if (error instanceof OpenCodeFatalEventError) {
+            fatal ??= error.message;
+          } else {
+            emitText("[opencode] malformed event line (redacted).");
+          }
         }
       }
     },
     async finish() {
       buffer = "";
       await pending;
+    },
+    fatalError() {
+      return fatal;
+    },
+    emittedCount() {
+      return emitted;
     },
   };
 }
@@ -321,6 +344,21 @@ function summarizeRun(input: CodingTaskInput, changedFiles: string[], stdoutTail
   return preview ? `${header}\n${preview}` : header;
 }
 
+/** Deleted paths carry no readable content, so they are counted only. */
+export function parseDeletedPaths(output: string): Set<string> {
+  const deleted = new Set<string>();
+  for (const line of output.split("\n")) {
+    if (line.length < 4) continue;
+    const staged = line[0];
+    const worktree = line[1];
+    if (staged !== "D" && worktree !== "D") continue;
+    for (const path of parsePorcelainStatus(line)) {
+      deleted.add(path);
+    }
+  }
+  return deleted;
+}
+
 interface CollectedChanges {
   changedFiles: string[];
   diff: string;
@@ -355,6 +393,7 @@ async function collectChanges(ops: SandboxOps, workdir: string, signal?: AbortSi
     throw new Error(`git status failed: ${boundTail(status.stderr, 1000)}`);
   }
   const changedFiles = parsePorcelainStatus(status.stdout).slice(0, MAX_CAPTURED_FILES);
+  const deletedFiles = parseDeletedPaths(status.stdout);
   if (changedFiles.length > 0) {
     // Intent-to-add makes new files show up in the worktree diff.
     const add = await ops.exec(
@@ -379,6 +418,7 @@ async function collectChanges(ops: SandboxOps, workdir: string, signal?: AbortSi
   let totalChars = 0;
   for (const path of changedFiles) {
     if (totalChars >= MAX_TOTAL_FILE_CHARS) break;
+    if (deletedFiles.has(path)) continue;
     const fullPath = `${workdir}/${path}`;
     // The ops layer enforces maxBytes and throws instead of truncating, so a
     // captured file is always complete or the whole run reports the error.

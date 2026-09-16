@@ -116,6 +116,7 @@ const SECRET_PATTERNS: RegExp[] = [
   /xox[bpas]-[A-Za-z0-9-]{8,}/g,
   /Bearer\s+[A-Za-z0-9._~+/-]{8,}={0,2}/gi,
   /api[_-]?key\s*[:=]\s*['"]?[A-Za-z0-9._~+/-]{8,}['"]?/gi,
+  /\b[A-Za-z0-9_]*(?:token|secret|password|passwd|api[_-]?key)\s*[:=]\s*['"]?[A-Za-z0-9._~+/-]{4,}['"]?/gi,
 ];
 
 /** Replace known secret shapes with [redacted]. Safe to run on any text. */
