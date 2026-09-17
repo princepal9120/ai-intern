@@ -1,0 +1,138 @@
+---
+title: AI Intern - The best self-hosted coding agent
+description: Delegate approval-gated coding tasks to isolated Cloudflare Sandbox containers running OpenCode.
+template: splash
+hero:
+  title: Ship code with a self-hosted cloud coding agent.
+  tagline: Delegate approval-gated tasks to parallel coding agents that plan, build, test, and ship — from GitHub issue to merged PR, 100% inside your Cloudflare account.
+  image:
+    file: ../../assets/ai_intern_hero.jpg
+  actions:
+    - text: Get Started
+      link: /docs/getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: Read the Docs
+      link: /docs/overview/
+      icon: document
+      variant: secondary
+    - text: Open Dashboard
+      link: /app/
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<div class="capy-terminal">
+  <div class="capy-terminal-header">
+    <div class="capy-terminal-dots">
+      <span class="dot-red"></span>
+      <span class="dot-yellow"></span>
+      <span class="dot-green"></span>
+    </div>
+    <div class="capy-terminal-title">ai-intern · cloudflare-worker · sandbox-session #1042</div>
+    <div style="font-size: 0.7rem; color: #10b981; font-weight: 600;">● READY</div>
+  </div>
+  <div class="capy-terminal-body">
+    <div><span class="term-prompt">agent&gt;</span> <span style="color: #93c5fd;">POST /api/runs</span> {"{"} task: "Fix auth token cookie expiration and add Vitest unit test", repo: "org/web-app" {"}"}</div>
+    <div style="margin-top: 0.5rem;"><span class="term-tag plan">PLAN READY</span> Orchestrator analyzed codebase &amp; generated 3-step delegation plan.</div>
+    <div><span class="term-tag gate">GATE</span> Approval requested via Dashboard &amp; Slack. Waiting for human sign-off...</div>
+    <div><span class="term-tag gate" style="background: rgba(34, 197, 94, 0.2); color: #4ade80;">APPROVED</span> Approved by human reviewer (dev@company.com).</div>
+    <div><span class="term-tag dock">SANDBOX</span> Spun up ephemeral Cloudflare micro-container running OpenCode in 180ms.</div>
+    <div><span class="term-tag pass">VITEST</span> Ran test suite: 14 test files passed, 68 assertions green, 0 regressions.</div>
+    <div><span class="term-tag pass" style="background: rgba(11, 159, 149, 0.25); color: #2dd4bf;">PR OPENED</span> Opened Pull Request #42: <span style="text-decoration: underline;">fix: refresh auth cookie on expiry</span></div>
+  </div>
+</div>
+
+<div class="capy-callout">
+  <div class="capy-callout-icon">⚡</div>
+  <div class="capy-callout-content">
+    <h4>Zero Host Access · Ephemeral Containers · Multi-Tenant Isolation</h4>
+    <p>Unlike traditional AI coding tools that execute scripts on your developer laptop or share multi-tenant compute, AI Intern delegates every task to an isolated, temporary Cloudflare Sandbox container running OpenCode.</p>
+  </div>
+</div>
+
+## Start here
+
+Quick pathways to get started with AI Intern on your infrastructure.
+
+<div class="capy-steps-grid">
+  <a href="/docs/getting-started/" class="capy-step-card" style="text-decoration: none;">
+    <div class="capy-step-num">01</div>
+    <div class="capy-step-title">Quickstart Guide</div>
+    <p class="capy-step-desc">Clone the repository, configure your Cloudflare credentials, and deploy your worker in under 5 minutes.</p>
+  </a>
+  <a href="/docs/architecture/" class="capy-step-card" style="text-decoration: none;">
+    <div class="capy-step-num">02</div>
+    <div class="capy-step-title">Architecture</div>
+    <p class="capy-step-desc">Understand how Durable Objects, Sandbox Containers, and Workers AI collaborate safely.</p>
+  </a>
+  <a href="/docs/security/" class="capy-step-card" style="text-decoration: none;">
+    <div class="capy-step-num">03</div>
+    <div class="capy-step-title">Security & Sandboxing</div>
+    <p class="capy-step-desc">Learn how isolation boundaries, secret redaction, and approval gates keep your code secure.</p>
+  </a>
+  <a href="/docs/github/" class="capy-step-card" style="text-decoration: none;">
+    <div class="capy-step-num">04</div>
+    <div class="capy-step-title">GitHub Integration</div>
+    <p class="capy-step-desc">Connect GitHub webhooks to turn issues and review comments directly into verified pull requests.</p>
+  </a>
+</div>
+
+## What you can do with AI Intern
+
+Delegate real engineering workflows with full human control, safety, and auditability.
+
+<CardGrid stagger>
+  <Card title="Approval-Gated Executions" icon="approve-check">
+    Never let an agent push code blindly. Inspect the delegation plan, affected files, and planned terminal commands before granting execution approval.
+  </Card>
+  <Card title="Isolated Sandbox Containers" icon="laptop">
+    Every coding task runs in its own micro-container powered by Cloudflare Containers and OpenCode. Malicious packages or runaway processes cannot escape.
+  </Card>
+  <Card title="Account-Owned Deployment" icon="seti:cloudflare">
+    Deploy directly to your own Cloudflare account. Your source code, API keys, repository secrets, and logs never touch third-party servers.
+  </Card>
+  <Card title="Automated Issue Triage & Bug Fixing" icon="puzzle">
+    Receive GitHub webhook events on new issues. AI Intern reproduces the bug, writes a regression test, fixes the logic, and opens a ready-to-merge PR.
+  </Card>
+  <Card title="Interactive Diff Review" icon="magnifier">
+    Review live syntax-highlighted diffs in the built-in React dashboard or directly inside Slack before approving pull request publication.
+  </Card>
+  <Card title="Autonomous Scheduled Sweeps" icon="setting">
+    Configure cron triggers that wake the agent to scan dependencies, refactor deprecated patterns, and run automated health checks.
+  </Card>
+</CardGrid>
+
+## Built for Cloudflare Platform
+
+Engineered specifically for Cloudflare's next-generation edge stack.
+
+<div class="capy-steps-grid">
+  <div class="capy-step-card">
+    <div class="capy-step-title">⚡ Cloudflare Workers</div>
+    <p class="capy-step-desc">Sub-millisecond routing, request orchestration, and signature-verified webhook processing at 300+ edge locations.</p>
+  </div>
+  <div class="capy-step-card">
+    <div class="capy-step-title">🛡️ Cloudflare Sandbox</div>
+    <p class="capy-step-desc">Instant container boot times running OpenCode with full Linux tooling, git, package managers, and test runners.</p>
+  </div>
+  <div class="capy-step-card">
+    <div class="capy-step-title">💾 Durable Objects</div>
+    <p class="capy-step-desc">Strongly consistent state persistence for task registries, run histories, and live status streams across instances.</p>
+  </div>
+  <div class="capy-step-card">
+    <div class="capy-step-title">🤖 Workers AI & Flash Models</div>
+    <p class="capy-step-desc">Blazing-fast plan synthesis with Gemini 3.5 Flash Lite and Llama 3.1 Instruct, managed via Cloudflare AI Gateway.</p>
+  </div>
+</div>
+
+<div class="capy-callout" style="text-align: center; justify-content: center; flex-direction: column; align-items: center; padding: 2.5rem 1.5rem;">
+  <h3 style="margin: 0 0 0.5rem 0; font-size: 1.5rem; color: #ffffff;">Ready to deploy your self-hosted AI Intern?</h3>
+  <p style="max-width: 36rem; margin: 0 0 1.5rem 0; color: #94a3b8;">Deploy to your own Cloudflare account in minutes with Wrangler, and start shipping software with confidence.</p>
+  <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
+    <a href="/docs/getting-started/" class="action primary" style="text-decoration: none;">Get Started Now →</a>
+    <a href="/docs/overview/" class="action secondary" style="text-decoration: none;">Read Documentation</a>
+  </div>
+</div>

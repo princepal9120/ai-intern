@@ -1,0 +1,676 @@
+/* Capy-inspired Theme for Starlight (AI Intern Docs & Marketing) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600;1,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Bangers&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Capy AI Mint / Teal Palette */
+  --capy-primary: #0B9F95;
+  --capy-primary-hover: #0ea5e9;
+  --capy-primary-light: #2dd4bf;
+  --capy-primary-dark: #097d75;
+  --capy-primary-glow: rgba(11, 159, 149, 0.25);
+  --capy-primary-subtle: rgba(11, 159, 149, 0.12);
+
+  /* Starlight Accent Tokens */
+  --sl-color-accent-low: rgba(11, 159, 149, 0.12);
+  --sl-color-accent: #0B9F95;
+  --sl-color-accent-high: #2dd4bf;
+
+  /* Fonts */
+  --sl-font-system: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --sl-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --sl-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* UI Tokens */
+  --sl-content-width: 65rem;
+  --sl-sidebar-width: 17.5rem;
+}
+
+/* Dark Theme Overrides (Default for Capy style) */
+:root[data-theme='dark'],
+.dark {
+  --sl-color-white: #f8fafc;
+  --sl-color-gray-1: #f1f5f9;
+  --sl-color-gray-2: #cbd5e1;
+  --sl-color-gray-3: #94a3b8;
+  --sl-color-gray-4: #475569;
+  --sl-color-gray-5: #1e293b;
+  --sl-color-gray-6: #0f172a;
+  --sl-color-black: #09090b;
+
+  --sl-color-bg: #09090b;
+  --sl-color-bg-nav: rgba(9, 9, 11, 0.85);
+  --sl-color-bg-sidebar: #09090b;
+  --sl-color-hairline: rgba(255, 255, 255, 0.07);
+  --sl-color-hairline-light: rgba(255, 255, 255, 0.12);
+
+  --card-bg: rgba(24, 24, 27, 0.65);
+  --card-border: rgba(255, 255, 255, 0.08);
+  --card-border-hover: rgba(11, 159, 149, 0.45);
+}
+
+/* Light Theme Overrides */
+:root[data-theme='light'] {
+  --sl-color-white: #09090b;
+  --sl-color-gray-1: #18181b;
+  --sl-color-gray-2: #3f3f46;
+  --sl-color-gray-3: #71717a;
+  --sl-color-gray-4: #a1a1aa;
+  --sl-color-gray-5: #e4e4e7;
+  --sl-color-gray-6: #f4f4f5;
+  --sl-color-black: #ffffff;
+
+  --sl-color-bg: #fafafa;
+  --sl-color-bg-nav: rgba(250, 250, 250, 0.85);
+  --sl-color-bg-sidebar: #fafafa;
+  --sl-color-hairline: rgba(0, 0, 0, 0.08);
+  --sl-color-hairline-light: rgba(0, 0, 0, 0.14);
+
+  --card-bg: #ffffff;
+  --card-border: rgba(0, 0, 0, 0.08);
+  --card-border-hover: rgba(11, 159, 149, 0.4);
+}
+
+/* Global Body Styling */
+body {
+  font-family: var(--sl-font);
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Smooth Background Glow */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100vw;
+  height: 600px;
+  max-width: 1400px;
+  background: radial-gradient(circle 400px at 50% -100px, var(--capy-primary-glow), transparent 75%);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.6;
+}
+
+/* Header & Navigation Bar (Frosted Glass) */
+header.header {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--sl-color-hairline);
+}
+
+/* Top Nav Site Title */
+.site-title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-size: 1.125rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.site-title::after {
+  content: 'Cloudflare Edition';
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 9999px;
+  background: var(--capy-primary-subtle);
+  color: var(--capy-primary);
+  border: 1px solid rgba(11, 159, 149, 0.3);
+}
+
+/* Sidebar Styling */
+nav.sidebar {
+  border-right: 1px solid var(--sl-color-hairline);
+}
+
+.sidebar-content .top-level > li + li {
+  margin-top: 1.25rem;
+}
+
+/* Sidebar Group Headers */
+.sidebar-content summary,
+.sidebar-content .large {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sl-color-gray-3);
+  margin-bottom: 0.35rem;
+}
+
+/* Sidebar Item Links */
+.sidebar-content a {
+  border-radius: 0.625rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 450;
+  transition: all 0.15s ease;
+  border-left: 2px solid transparent;
+}
+
+.sidebar-content a:hover {
+  background: var(--capy-primary-subtle);
+  color: var(--sl-color-white);
+}
+
+.sidebar-content a[aria-current='page'] {
+  background: var(--capy-primary-subtle);
+  color: var(--capy-primary);
+  font-weight: 600;
+  border-left-color: var(--capy-primary);
+}
+
+/* Hero Section Enhancement */
+.hero {
+  position: relative;
+  padding-top: 2rem !important;
+  padding-bottom: 3rem !important;
+  text-align: center;
+}
+
+.hero > img,
+.hero picture {
+  border-radius: 1rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px var(--capy-primary-glow);
+  border: 1px solid var(--sl-color-hairline-light);
+  max-width: 92%;
+  margin: 1.5rem auto 0;
+  transition: transform 0.3s ease;
+}
+
+.hero picture:hover {
+  transform: translateY(-3px);
+}
+
+.hero .tagline {
+  font-size: 1.2rem !important;
+  line-height: 1.6 !important;
+  max-width: 44rem;
+  margin: 1rem auto 1.75rem !important;
+  color: var(--sl-color-gray-2);
+}
+
+/* Action Buttons */
+.hero .actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.action.primary {
+  background: linear-gradient(135deg, #0B9F95 0%, #0d9488 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  border-radius: 0.75rem !important;
+  padding: 0.65rem 1.4rem !important;
+  box-shadow: 0 4px 14px var(--capy-primary-glow) !important;
+  transition: all 0.2s ease !important;
+}
+
+.action.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px var(--capy-primary-glow) !important;
+  opacity: 0.95;
+}
+
+.action.secondary {
+  border-radius: 0.75rem !important;
+  padding: 0.65rem 1.4rem !important;
+  background: var(--card-bg) !important;
+  border: 1px solid var(--card-border) !important;
+  color: var(--sl-color-white) !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+}
+
+.action.secondary:hover {
+  border-color: var(--capy-primary) !important;
+  transform: translateY(-2px);
+}
+
+/* Bento Grid & Cards (Capy Style) */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin: 1.5rem 0 2.5rem;
+}
+
+.card {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--card-border) !important;
+  border-radius: 1rem !important;
+  padding: 1.5rem !important;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(8px);
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--capy-primary), transparent);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  border-color: var(--card-border-hover) !important;
+  box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.4), 0 0 20px rgba(11, 159, 149, 0.15);
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+.card .title {
+  font-size: 1.05rem !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+  color: var(--sl-color-white) !important;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.card .icon {
+  background: var(--capy-primary-subtle) !important;
+  color: var(--capy-primary) !important;
+  padding: 0.5rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(11, 159, 149, 0.25);
+  width: 2.25rem;
+  height: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+/* Eyebrow & Badges */
+.capy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.85rem;
+  border-radius: 9999px;
+  background: var(--capy-primary-subtle);
+  border: 1px solid rgba(11, 159, 149, 0.35);
+  color: var(--capy-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-bottom: 1rem;
+}
+
+.capy-badge .pulse-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--capy-primary);
+  box-shadow: 0 0 8px var(--capy-primary);
+  animation: capy-pulse 2s infinite;
+}
+
+@keyframes capy-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+/* Interactive Terminal Simulation Box */
+.capy-terminal {
+  background: #0d0e12;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.875rem;
+  overflow: hidden;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7);
+  margin: 2rem 0;
+  font-family: var(--sl-font-mono);
+  font-size: 0.85rem;
+}
+
+.capy-terminal-header {
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.65rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.capy-terminal-dots {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.capy-terminal-dots span {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-red { background: #ff5f56; }
+.dot-yellow { background: #ffbd2e; }
+.dot-green { background: #27c93f; }
+
+.capy-terminal-title {
+  color: var(--sl-color-gray-3);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.capy-terminal-body {
+  padding: 1.25rem 1.5rem;
+  line-height: 1.7;
+  color: #e2e8f0;
+}
+
+.term-prompt {
+  color: var(--capy-primary);
+  font-weight: 600;
+}
+
+.term-tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.35rem;
+  margin-right: 0.5rem;
+}
+
+.term-tag.pass { background: rgba(39, 201, 63, 0.2); color: #4ade80; }
+.term-tag.plan { background: rgba(14, 165, 233, 0.2); color: #38bdf8; }
+.term-tag.gate { background: rgba(250, 204, 21, 0.2); color: #facc15; }
+.term-tag.dock { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+
+/* Callout Box Styling */
+.capy-callout {
+  background: linear-gradient(135deg, rgba(11, 159, 149, 0.08) 0%, rgba(14, 165, 233, 0.04) 100%);
+  border: 1px solid rgba(11, 159, 149, 0.25);
+  border-radius: 0.875rem;
+  padding: 1.25rem 1.5rem;
+  margin: 1.75rem 0;
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.capy-callout-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--capy-primary);
+}
+
+.capy-callout-content h4 {
+  margin: 0 0 0.25rem 0 !important;
+  color: var(--sl-color-white) !important;
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
+}
+
+.capy-callout-content p {
+  margin: 0 !important;
+  font-size: 0.875rem !important;
+  color: var(--sl-color-gray-2) !important;
+}
+
+/* Quickstart Step Numbers */
+.capy-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.25rem;
+  margin: 1.5rem 0;
+}
+
+.capy-step-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.875rem;
+  padding: 1.25rem;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.capy-step-card:hover {
+  border-color: var(--card-border-hover);
+  transform: translateY(-2px);
+}
+
+.capy-step-num {
+  font-family: var(--sl-font-mono);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--capy-primary);
+  background: var(--capy-primary-subtle);
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+  border: 1px solid rgba(11, 159, 149, 0.3);
+}
+
+.capy-step-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--sl-color-white);
+  margin-bottom: 0.35rem;
+}
+
+.capy-step-desc {
+  font-size: 0.825rem;
+  color: var(--sl-color-gray-3);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Starlight Search Bar Styling (Capy Mintlify style) */
+button[data-open-modal] {
+  border-radius: 0.75rem !important;
+  border: 1px solid var(--card-border) !important;
+  background: var(--card-bg) !important;
+  color: var(--sl-color-gray-3) !important;
+  padding: 0.45rem 0.85rem !important;
+  font-size: 0.8125rem !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+button[data-open-modal]:hover {
+  border-color: var(--card-border-hover) !important;
+  color: var(--sl-color-white) !important;
+  background: var(--sl-color-hairline) !important;
+}
+
+button[data-open-modal] kbd {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 0.35rem !important;
+  font-size: 0.7rem !important;
+  color: var(--sl-color-gray-2) !important;
+}
+
+/* Search Dialog & Pagefind Modal */
+dialog {
+  border-radius: 1rem !important;
+  border: 1px solid var(--card-border) !important;
+  background: #09090b !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 40px var(--capy-primary-glow) !important;
+}
+
+/* Code Blocks & Expressive Code */
+.expressive-code {
+  margin: 1.5rem 0 !important;
+}
+
+.expressive-code .frame {
+  border-radius: 0.875rem !important;
+  border: 1px solid var(--card-border) !important;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Tables */
+table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  border-radius: 0.75rem !important;
+  border: 1px solid var(--sl-color-hairline) !important;
+  overflow: hidden !important;
+  width: 100% !important;
+  margin: 1.5rem 0 !important;
+}
+
+th {
+  background: var(--sl-color-hairline) !important;
+  color: var(--sl-color-white) !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  padding: 0.75rem 1rem !important;
+  border-bottom: 1px solid var(--sl-color-hairline) !important;
+}
+
+td {
+  padding: 0.75rem 1rem !important;
+  border-bottom: 1px solid var(--sl-color-hairline) !important;
+  font-size: 0.875rem !important;
+}
+
+tr:last-child td {
+  border-bottom: none !important;
+}
+
+/* Manga & Capy.ai Specific Design System */
+.font-display {
+  font-family: 'Bebas Neue', Impact, sans-serif;
+  letter-spacing: 0.04em;
+}
+
+.font-comic {
+  font-family: 'Bangers', 'Comic Sans MS', cursive, sans-serif;
+  letter-spacing: 0.05em;
+}
+
+.font-tech {
+  font-family: 'DM Mono', 'Geist Mono', monospace;
+}
+
+/* Infinite Marquee */
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes marquee-reverse {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0%); }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 25s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+.animate-marquee-slow {
+  display: flex;
+  width: max-content;
+  animation: marquee 45s linear infinite;
+}
+
+.animate-marquee-slow:hover {
+  animation-play-state: paused;
+}
+
+/* Halftone & Screentone Overlay */
+.manga-dots {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+/* Comic Speech Bubbles */
+.comic-bubble {
+  position: relative;
+  background: #ffffff;
+  color: #000000;
+  border: 3px solid #000000;
+  border-radius: 1.25rem;
+  box-shadow: 4px 4px 0px #000000;
+}
+
+.comic-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -14px;
+  left: 28px;
+  border-width: 14px 12px 0;
+  border-style: solid;
+  border-color: #ffffff transparent;
+  display: block;
+  width: 0;
+}
+
+.comic-bubble::before {
+  content: '';
+  position: absolute;
+  bottom: -18px;
+  left: 26px;
+  border-width: 16px 14px 0;
+  border-style: solid;
+  border-color: #000000 transparent;
+  display: block;
+  width: 0;
+}
+
+/* Neo-brutalist / Comic Borders */
+.comic-box {
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  background: #0d0f12;
+  box-shadow: 6px 6px 0px 0px rgba(11, 159, 149, 0.35);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.comic-box:hover {
+  box-shadow: 8px 8px 0px 0px rgba(11, 159, 149, 0.6);
+  transform: translate(-2px, -2px);
+}
+
+/* Diff Highlighting */
+.diff-line-add {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border-left: 2px solid #22c55e;
+}
+
+.diff-line-del {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-left: 2px solid #ef4444;
+}
