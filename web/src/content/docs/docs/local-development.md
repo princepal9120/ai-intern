@@ -23,7 +23,7 @@ npx wrangler dev
 
 Use the URL printed by Wrangler (normally port 8787). A compatible local Docker engine is required by the container configuration; startup itself may fail without it. Cloudflare bindings and model calls can also require account configuration and network access.
 
-The sandbox must reach `WORKER_ORIGIN`; localhost inside a container is not your host's Worker. The provider callback/authentication integration is unresolved, see [Readiness](/docs/readiness/). Do not expose an unauthenticated tunnel to work around it. Unit tests use fakes and need no container or cloud account.
+The sandbox talks to GitHub and the model provider host; Sandbox egress intercepts those hosts. There is no Worker callback URL. Do not expose an unauthenticated tunnel. Unit tests use fakes and need no container or cloud account.
 
 ## Documentation
 

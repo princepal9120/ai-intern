@@ -4,7 +4,7 @@ description: Delegate approval-gated coding tasks to isolated Cloudflare Sandbox
 template: splash
 hero:
   title: Ship code with a self-hosted cloud coding agent.
-  tagline: "Delegate approval-gated tasks to parallel coding agents that plan, build, test, and ship, from GitHub issue to merged PR, 100% inside your Cloudflare account."
+  tagline: "Delegate approval-gated tasks to parallel coding agents that plan, build, test, and ship, local prototype until a dated live run is recorded in VERIFICATION.md."
   image:
     file: ../../assets/ai_intern_hero.jpg
   actions:
@@ -48,8 +48,8 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 <div class="ai-callout">
   <div class="ai-callout-icon">⚡</div>
   <div class="ai-callout-content">
-    <h4>Zero Host Access · Ephemeral Containers · Multi-Tenant Isolation</h4>
-    <p>Unlike traditional AI coding tools that execute scripts on your developer laptop or share multi-tenant compute, AI Intern delegates every task to an isolated, temporary Cloudflare Sandbox container running OpenCode.</p>
+    <h4>Zero Host Access · Ephemeral Containers · Single-Tenant Isolation</h4>
+    <p>Unlike tools that execute on a developer laptop, AI Intern delegates every task to an isolated Cloudflare Sandbox container. Each installation is single-tenant and account-owned.</p>
   </div>
 </div>
 
@@ -116,7 +116,7 @@ Engineered specifically for Cloudflare's next-generation edge stack.
   </div>
   <div class="ai-step-card">
     <div class="ai-step-title">🛡️ Cloudflare Sandbox</div>
-    <p class="ai-step-desc">Instant container boot times running OpenCode with full Linux tooling, git, package managers, and test runners.</p>
+    <p class="ai-step-desc">Isolated OpenCode runs with git and Linux tooling. Package registries are off the egress allowlist in v0.1. Cold start is unmeasured until T10.</p>
   </div>
   <div class="ai-step-card">
     <div class="ai-step-title">💾 Durable Objects</div>

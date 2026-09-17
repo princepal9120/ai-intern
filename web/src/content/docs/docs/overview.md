@@ -44,12 +44,11 @@ implemented by `src/index.ts`. Read [Security](/docs/security/) first.
 ## Current behavior (as implemented)
 
 Sandbox is the working runtime adapter. The `computer` adapter deliberately
-refuses execution. OpenCode is configured with a dummy container key, but
-the public provider callback is disabled (503). The new binding-based provider
-helper is not connected to Sandbox egress, so live coding remains blocked.
-Private Git clone authorization is not wired into the sandbox adapter.
-Sources: `src/runtime.ts`, `src/provider-gateway.ts`,
-`src/agents/opencode-agent.ts`.
+refuses execution. OpenCode is configured with a dummy container key; the
+real provider credential is swapped in at Sandbox egress. There is no public
+provider callback. Private Git clone still uses HTTPS without a clone-time
+token; path-scoped `GITHUB_TOKEN` is attached only for the approved repo.
+Sources: `src/runtime.ts`, `src/egress.ts`, `src/agents/opencode-agent.ts`.
 
 ## Specification target (GOAL)
 

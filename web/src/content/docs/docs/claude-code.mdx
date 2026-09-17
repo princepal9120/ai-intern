@@ -1,46 +1,21 @@
 ---
 title: Claude Code & OpenCode Harnesses
-description: Running Claude Code and OpenCode inside isolated Cloudflare Sandbox containers.
+description: Running OpenCode (shipped) and Claude Code / Codex (unit-tested, not in the image) inside Sandbox containers.
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-AI Intern delegates autonomous coding workflows to execution harnesses running inside isolated Cloudflare Sandbox micro-containers.
+**Current behavior (as implemented):** the Dockerfile installs `opencode-ai@1.18.31` only. `AGENT_HARNESS=claude-code` or `codex` is unit-tested and fails at exec until a matching image exists.
 
-## Supported Harnesses
+**Specification target (GOAL / PLAN T22):** API-key harnesses only. Subscription credentials are not proxied.
 
 <CardGrid>
-  <Card title="Claude Code" icon="puzzle">
-    Anthropic's agentic CLI tool. Executes multi-file editing, test-driven iteration, and codebase investigation with deep reasoning.
+  <Card title="OpenCode (shipped image)" icon="setting">
+    Default. Dummy key in the container; Sandbox egress swaps in the AI Gateway credential for `generativelanguage.googleapis.com`.
   </Card>
-  <Card title="OpenCode" icon="setting">
-    Open-source coding agent interpreter. Lightweight, fast spinup, with native tool integration for Cloudflare Workers environments.
+  <Card title="Claude Code / Codex (not in image)" icon="puzzle">
+    Adapters live in `src/harness/`. Same dummy-key pattern for `api.anthropic.com` and `api.openai.com`. `allowedHosts` is the selected harness plus git, never the union.
   </Card>
 </CardGrid>
 
-## Container Isolation Architecture
-
-Coding agents execute arbitrary terminal commands, run build tools, and install npm/pip packages. Running these tasks on production servers or developer workstations presents severe security risks.
-
-AI Intern eliminates these risks using Cloudflare Sandbox:
-
-- **gVisor Virtualization**: Each container executes in an isolated sandbox with kernel-level syscall interception.
-- **Ephemeral Lifecycle**: The container filesystem is created on demand for a single task and destroyed upon completion.
-- **Egress Filtering**: Outbound network connections are strictly restricted to approved package registries and GitHub.
-- **AI Gateway Forwarding**: LLM API calls route through Cloudflare AI Gateway, keeping credentials off the container filesystem.
-
-## Harness Selection
-
-You can specify the execution harness on a per-task basis in your request payload:
-
-```json
-{
-  "repoUrl": "https://github.com/princepal9120/ai-intern",
-  "task": "Migrate tests to Vitest 5.0",
-  "harness": "claude-code",
-  "baseBranch": "main"
-}
-```
-
-If omitted, AI Intern defaults to `opencode` for low-latency tasks and `claude-code` for complex refactors.
-
+Set `AGENT_HARNESS` as a Worker var. There is no per-task `harness` field on `delegate_coding_task`. `registry.npmjs.org` is not on the egress allowlist, so `npm install` inside a run is refused.

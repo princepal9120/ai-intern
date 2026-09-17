@@ -130,19 +130,11 @@ import '../styles/theme.css';
       border-left: 2px solid #ef4444;
     }
   </style>
+  <!-- Interactive Cursor-Following Doge Mascot (Inspired by ramx.in) -->
+  <script is:inline src="/assets/mascot/pet-mascot.js"></script>
 </head>
 <body class="font-sans antialiased bg-[#08090b] text-gray-100 selection:bg-teal-400 selection:text-black overflow-x-hidden">
   <div class="fixed inset-0 z-[-1] grid-bg h-screen w-full pointer-events-none"></div>
-
-  <!-- Announcement Bar (Verified Open Source Release) -->
-  <div class="bg-gradient-to-r from-teal-950 via-zinc-900 to-teal-950 border-b border-teal-500/20 py-2.5 px-4 text-center text-xs sm:text-sm font-tech">
-    <a href="/docs/overview" class="inline-flex items-center gap-2 text-gray-300 hover:text-white transition-colors group">
-      <span class="bg-teal-400/10 text-teal-400 border border-teal-400/30 px-2 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase">Open Source Release</span>
-      <img src="/assets/mascot/doge-avatar.svg" alt="Doge Team" class="w-5 h-5 rounded-full inline-block object-contain" style="width: 20px; height: 20px;" />
-      <span class="font-medium text-white group-hover:underline">v0.2.0 is live: Self-hosted coding agent on Cloudflare Workers and Sandbox</span>
-      <span class="text-teal-400 font-bold ml-1 transition-transform group-hover:translate-x-1">→</span>
-    </a>
-  </div>
 
   <!-- Sticky Header -->
   <header class="sticky top-0 z-50 w-full border-b border-white/10 bg-[#08090b] shadow-xl">
@@ -234,7 +226,7 @@ import '../styles/theme.css';
         <div class="flex flex-col sm:flex-row items-center justify-center gap-6 mb-16 w-full max-w-md sm:max-w-none">
           <div class="relative group w-full sm:w-auto">
             <!-- animated mascot sleeping directly on top of button with breathing & hover animation -->
-            <div class="absolute -top-7 right-6 sm:right-4 z-20 pointer-events-none transition-transform duration-300 group-hover:-translate-y-2 group-hover:scale-110">
+            <div data-mascot-static="true" class="absolute -top-7 right-6 sm:right-4 z-20 pointer-events-none transition-transform duration-300 group-hover:-translate-y-2 group-hover:scale-110">
               <img src="/assets/mascot/doge-sleeping.svg" alt="Doge resting" class="w-14 h-auto drop-shadow-lg mascot-breathing" style="width: 56px; height: 35px;" />
             </div>
             <a href="/docs/getting-started" class="w-full sm:w-auto relative flex items-center justify-center gap-3 bg-teal-400 text-black font-display text-2xl tracking-wider px-9 py-4 rounded-2xl comic-btn-shadow border-2 border-teal-300 hover:bg-teal-300 transition-all">
@@ -784,77 +776,91 @@ import '../styles/theme.css';
       </div>
     </section>
 
-    <!-- SECTION: SELF-HOSTING & COSTS (Honest OSS Breakdown) -->
+    <!-- SECTION: SELF-HOSTING & OPEN SOURCE (No Fake SaaS Pricing Tiers) -->
     <section id="pricing" class="py-24 border-t border-white/10 relative">
       <div class="max-w-7xl mx-auto px-4 sm:px-6">
-        <div class="text-center max-w-2xl mx-auto mb-16">
-          <div class="inline-flex items-center gap-2 bg-emerald-400/10 text-emerald-300 border border-emerald-400/30 px-3 py-1 rounded-full text-xs font-tech font-bold uppercase mb-4">
-            <img src="/assets/mascot/doge-riding.svg" alt="Card" class="w-4 h-4 object-contain" style="width: 16px; height: 16px;" />
-            <span>TRANSPARENT COSTS</span>
+        <div class="text-center max-w-3xl mx-auto mb-16">
+          <div class="inline-flex items-center gap-2 bg-teal-400/10 text-teal-300 border border-teal-400/30 px-3 py-1 rounded-full text-xs font-tech font-bold uppercase mb-4">
+            <span class="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
+            <span>100% OPEN SOURCE & ACCOUNT-OWNED</span>
           </div>
-          <h2 class="font-display text-3xl sm:text-4xl lg:text-5xl text-white tracking-wide leading-tight">
-            Free open source software with zero SaaS subscription fees.
+          <h2 class="font-display text-4xl sm:text-5xl lg:text-6xl text-white tracking-wide leading-tight uppercase">
+            No Subscription Fees. No Seat Tax.
           </h2>
-          <p class="font-tech text-gray-400 mt-2">You only pay Cloudflare directly for the serverless compute and tokens you consume.</p>
+          <p class="font-tech text-gray-300 mt-4 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+            AI Intern is free open-source software under the MIT License. Deploy directly to your own Cloudflare account with zero middleman markups.
+          </p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-stretch text-left">
-          <!-- Community Free OSS Plan -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto items-stretch text-left">
+          <!-- Card 1: Community Open Source -->
           <div class="bg-zinc-900/90 border-2 border-teal-500/40 rounded-3xl p-8 comic-card-teal flex flex-col justify-between relative overflow-hidden">
             <div class="absolute top-4 right-4 bg-teal-400 text-black text-[11px] font-bold font-tech px-2.5 py-0.5 rounded-full uppercase">MIT LICENSE</div>
             <div>
-              <h3 class="font-display text-3xl text-white">OPEN SOURCE</h3>
-              <p class="font-tech text-xs text-gray-400 mt-1">100% Free and self-hosted</p>
-              <div class="mt-6 mb-8 flex items-baseline gap-2">
-                <span class="font-display text-5xl text-white">$0</span>
-                <span class="font-tech text-gray-400 text-sm">forever</span>
+              <div class="w-12 h-12 rounded-xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center text-teal-300 mb-6">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
               </div>
-              <ul class="space-y-3 font-tech text-sm text-gray-300 mb-8">
-                <li class="flex items-center gap-2.5">
-                  <span class="text-teal-400">✓</span> Full source code access under MIT License
+              <h3 class="font-display text-3xl text-white">Full Source Transparency</h3>
+              <p class="font-tech text-xs text-teal-300 mt-1">Fork, inspect, and customize without limits</p>
+              
+              <ul class="space-y-3.5 font-tech text-sm text-gray-300 my-8">
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 font-bold mt-0.5">✓</span>
+                  <span><strong class="text-white">100% Open Source:</strong> Permissive MIT license with zero commercial restrictions.</span>
                 </li>
-                <li class="flex items-center gap-2.5">
-                  <span class="text-teal-400">✓</span> Run unlimited tasks and PR reviews locally or in cloud
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 font-bold mt-0.5">✓</span>
+                  <span><strong class="text-white">Unlimited Team Seats:</strong> Add your whole team without paying $20–$50/user monthly SaaS fees.</span>
                 </li>
-                <li class="flex items-center gap-2.5">
-                  <span class="text-teal-400">✓</span> Connect any model via Cloudflare AI Gateway
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 font-bold mt-0.5">✓</span>
+                  <span><strong class="text-white">Model Agnostic:</strong> Connect Claude 3.7, Gemini 2.5, OpenAI, or local weights with your own keys.</span>
                 </li>
-                <li class="flex items-center gap-2.5">
-                  <span class="text-teal-400">✓</span> No user seat limits or artificial restrictions
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 font-bold mt-0.5">✓</span>
+                  <span><strong class="text-white">Extensible Workflows:</strong> Customize approval policies, webhook handlers, and container images.</span>
                 </li>
               </ul>
             </div>
-            <a href="/docs/getting-started" class="w-full text-center bg-teal-400 text-black font-display text-xl px-6 py-3.5 rounded-xl comic-btn-shadow border border-teal-300">
-              Deploy to Cloudflare
+            <a href="/docs/getting-started" class="w-full text-center bg-teal-400 text-black font-display text-xl px-6 py-3.5 rounded-xl comic-btn-shadow border border-teal-300 hover:bg-teal-300 transition-all">
+              Deploy with Wrangler →
             </a>
           </div>
 
-          <!-- Infrastructure Cost Breakdown -->
+          <!-- Card 2: Self-Hosted Cloudflare Infrastructure -->
           <div class="bg-zinc-900/80 border border-white/10 rounded-3xl p-8 comic-card-shadow flex flex-col justify-between">
             <div>
-              <h3 class="font-display text-3xl text-white">ESTIMATED CLOUD COSTS</h3>
-              <p class="font-tech text-xs text-gray-400 mt-1">Paid directly to Cloudflare and model providers</p>
-              <div class="mt-6 mb-8 flex items-baseline gap-2">
-                <span class="font-display text-5xl text-white">~$5</span>
-                <span class="font-tech text-gray-400 text-sm">/ month baseline</span>
+              <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-300 mb-6">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
               </div>
-              <ul class="space-y-3 font-tech text-sm text-gray-300 mb-8">
-                <li class="flex items-center gap-2.5">
-                  <span class="text-teal-400">✓</span> Cloudflare Workers Paid plan ($5/mo for Durable Objects)
+              <h3 class="font-display text-3xl text-white">Direct Infrastructure Control</h3>
+              <p class="font-tech text-xs text-gray-400 mt-1">Zero SaaS margin · Pay Cloudflare directly</p>
+              
+              <ul class="space-y-3.5 font-tech text-sm text-gray-300 my-8">
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 font-bold mt-0.5">✓</span>
+                  <span><strong class="text-white">Account Owned:</strong> Runs inside your own Cloudflare perimeter. Your code never leaves your account.</span>
                 </li>
-                <li class="flex items-center gap-2.5">
-                  <span class="text-teal-400">✓</span> Sandbox compute billed by exact execution seconds
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 font-bold mt-0.5">✓</span>
+                  <span><strong class="text-white">Direct Provider Billing:</strong> Pay your cloud and model providers directly with zero SaaS markup.</span>
                 </li>
-                <li class="flex items-center gap-2.5">
-                  <span class="text-teal-400">✓</span> Direct provider token costs without SaaS markups
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 font-bold mt-0.5">✓</span>
+                  <span><strong class="text-white">Per-Second Compute:</strong> Isolated Sandbox micro-containers bill only for exact active execution time.</span>
                 </li>
-                <li class="flex items-center gap-2.5">
-                  <span class="text-teal-400">✓</span> Complete cost predictability and spend caps
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 font-bold mt-0.5">✓</span>
+                  <span><strong class="text-white">Granular Spend Limits:</strong> Set hard budget caps and quotas in your own Cloudflare dashboard.</span>
                 </li>
               </ul>
             </div>
             <a href="/docs/costs" class="w-full text-center bg-zinc-800 text-white font-tech text-sm px-6 py-3.5 rounded-xl border border-white/15 hover:bg-zinc-700 transition-colors">
-              View Cost Model & Breakdown
+              Read Cloud Cost Breakdown →
             </a>
           </div>
         </div>

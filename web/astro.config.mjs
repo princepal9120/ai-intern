@@ -14,7 +14,7 @@ export default defineConfig({
 		starlight({
 			title: 'AI Intern',
 			description:
-				'Open-source multi-agent coding system. Slack/Jira to GitHub PR with approval gates.',
+				'Open-source, self-hosted coding agent. Slack and dashboard to GitHub PR with approval gates.',
 			logo: {
 				src: './src/assets/logo.svg',
 				alt: 'AI Intern Logo',
@@ -41,7 +41,6 @@ export default defineConfig({
 				{
 					label: 'Core Concepts',
 					items: [
-						{ label: 'Multi-Agent Orchestration', slug: 'docs/multi-agent' },
 						{ label: 'Approval Gates', slug: 'docs/approval-gates' },
 						{ label: 'Claude Code & OpenCode', slug: 'docs/claude-code' },
 						{ label: 'Cloudflare Sandbox', slug: 'docs/security' },
@@ -51,7 +50,6 @@ export default defineConfig({
 					label: 'Integrations',
 					items: [
 						{ label: 'Slack Integration', slug: 'docs/slack' },
-						{ label: 'Jira Integration', slug: 'docs/jira' },
 						{ label: 'GitHub Pull Requests', slug: 'docs/github' },
 						{ label: 'Automations & Cron', slug: 'docs/automations' },
 					],
@@ -60,7 +58,6 @@ export default defineConfig({
 					label: 'Operations & Dashboard',
 					items: [
 						{ label: 'Tasks & Runs Dashboard', slug: 'docs/dashboard' },
-						{ label: 'Reviews & Code Diff', slug: 'docs/review' },
 						{ label: 'Configuration & Secrets', slug: 'docs/configuration' },
 						{ label: 'Local development', slug: 'docs/local-development' },
 						{ label: 'Deployment', slug: 'docs/deployment' },

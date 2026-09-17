@@ -32,10 +32,10 @@ A dry run is not a deployment. See [Local development](/docs/local-development/)
 
 ## Documentation changes
 
-Edit pages under `docs/src/content/docs/`. Keep `title` and `description`
+Edit pages under `web/src/content/docs/`. Keep `title` and `description`
 frontmatter, descriptive headings, and links using the `/docs/` base.
 Starlight supplies navigation and search; avoid duplicating its interface.
-Source: `docs/astro.config.mjs` and `docs/src/content.config.ts`.
+Source: `web/astro.config.mjs`.
 
 Write technical claims from `src/`, `wrangler.jsonc`, and the installed
 configuration rather than copying README assumptions. Cite relevant source
@@ -69,6 +69,5 @@ of them requires re-running the live acceptance checklist (T10).
 | `@cloudflare/sandbox` | `0.12.9` | Must match the base image tag in `Dockerfile`. The `interceptHttps` + `outboundByHost` mechanism is the "no credentials in the container" guarantee. |
 | `CODING_MODEL` | `google/gemini-3.5-flash-lite` | Model ids retire. A retired model fails silently at run time. |
 
-Add a startup assertion so the next retirement fails loudly at deploy rather
-than silently at run time.
+`src/index.ts` throws on first request if `CODING_MODEL` is in the retired-id deny list.
 
