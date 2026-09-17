@@ -3,8 +3,15 @@
  * An experimental adapter for @cloudflare/computer exists only as a
  * guarded refusal: Computer is preview-only, so it must never silently
  * replace the default Sandbox path.
+ *
+ * What agent runs inside the sandbox is a second, narrower seam:
+ * AgentHarness (src/harness/types.ts). SandboxRuntimeAdapter keeps
+ * clone → configure → run → collect; only config, argv, and event parsing
+ * are harness-dispatched (default: OpenCode).
  */
 import type { CodingTaskInput, CodingTaskResult } from "./opencode-input.js";
+import { OpenCodeErrorEvent as OpenCodeErrorEventImpl, opencodeHarness } from "./harness/opencode.js";
+import type { AgentHarness } from "./harness/types.js";
 import { DUMMY_PROVIDER_KEY } from "./provider-gateway.js";
 import { boundTail, redactSecrets, shellJoin, shellQuote } from "./security.js";
 
@@ -67,6 +74,11 @@ export const COMPUTER_PREVIEW_MESSAGE =
 
 export class SandboxRuntimeAdapter implements RuntimeAdapter {
   readonly name = "sandbox" as const;
+  private readonly harness: AgentHarness;
+
+  constructor(harness: AgentHarness = opencodeHarness) {
+    this.harness = harness;
+  }
 
   async runCodingTask(
     ops: SandboxOps,
@@ -88,16 +100,16 @@ export class SandboxRuntimeAdapter implements RuntimeAdapter {
     await emit({ phase: "configure", message: "Writing isolated OpenCode config.", fraction: 0.15 });
     throwIfAborted(opts?.signal);
     try {
-      await ops.writeFile(configPath, JSON.stringify(buildOpencodeConfig(input), null, 2));
+      await ops.writeFile(configPath, JSON.stringify(this.harness.buildConfig(input), null, 2));
     } catch (error) {
       return failureResult(`Config write failed: ${shortError(error)}`, 0, "");
     }
 
     await emit({ phase: "code", message: "Running OpenCode headlessly.", fraction: 0.25 });
     throwIfAborted(opts?.signal);
-    const argv = buildOpencodeArgv(input, workdir);
+    const argv = this.harness.buildArgv(input, workdir);
     let run: ExecResult;
-    const output = streamProgress(emit, opts?.signal);
+    const output = streamProgress(this.harness, emit, opts?.signal);
     try {
       run = await ops.exec(shellJoin(argv), {
         cwd: workdir,
@@ -115,6 +127,9 @@ export class SandboxRuntimeAdapter implements RuntimeAdapter {
     } catch (error) {
       await output.finish();
       throwIfAborted(opts?.signal);
+      if (error instanceof OpenCodeErrorEventImpl) {
+        return failureResult(error.message, 0, "");
+      }
       return failureResult(`OpenCode execution failed: ${shortError(error)}`, 0, "");
     }
     const stderrTail = redactSecrets(boundTail(run.stderr, MAX_STDERR_TAIL_CHARS));
@@ -187,39 +202,9 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
 }
 
 /** Thrown when a streamed OpenCode event line is malformed. */
-export class OpenCodeEventError extends Error {}
-
-/**
- * Parse one `--format json` event line into progress text. OpenCode emits
- * newline-delimited JSON; anything else is surfaced as an honest error.
- */
-export function parseOpencodeEvent(line: string): string | null {
-  const trimmed = line.trim();
-  if (!trimmed) return null;
-  let event: unknown;
-  try {
-    event = JSON.parse(trimmed);
-  } catch {
-    throw new OpenCodeEventError(`Unparseable OpenCode event: ${boundTail(trimmed, 200)}`);
-  }
-  if (event === null || typeof event !== "object" || Array.isArray(event)) {
-    throw new OpenCodeEventError("OpenCode event is not an object.");
-  }
-  const record = event as Record<string, unknown>;
-  if (record.type === "error") {
-    const detail = typeof record.message === "string" ? record.message : JSON.stringify(record);
-    throw new OpenCodeEventError(`OpenCode error event: ${boundTail(detail, 500)}`);
-  }
-  const part = record.part ?? record.parts;
-  const text = typeof part === "string" ? part : summarizeUnknown(record);
-  return boundTail(text.trim() || summarizeUnknown(record), 500);
-}
-
-function summarizeUnknown(record: Record<string, unknown>): string {
-  const type = typeof record.type === "string" ? record.type : "event";
-  const keys = Object.keys(record).filter((key) => key !== "type" && key !== "part").slice(0, 6);
-  return keys.length ? `${type} (${keys.join(", ")})` : type;
-}
+export { OpenCodeEventError } from "./harness/opencode.js";
+export { OpenCodeErrorEvent } from "./harness/opencode.js";
+export { buildOpencodeArgv, buildOpencodeConfig, parseOpencodeEvent } from "./harness/opencode.js";
 
 interface OutputStream {
   onData: (stream: "stdout" | "stderr", data: string) => void;
@@ -229,8 +214,10 @@ interface OutputStream {
 /**
  * Bridge exec output into progress events. Bounded: at most 256 events are
  * emitted per run, stdout lines drive progress and stderr is only counted.
+ * Event parsing is harness-dispatched; error events propagate so the run
+ * fails honestly.
  */
-function streamProgress(emit: ProgressEmitter, signal?: AbortSignal): OutputStream {
+function streamProgress(harness: AgentHarness, emit: ProgressEmitter, _signal?: AbortSignal): OutputStream {
   let buffer = "";
   let emitted = 0;
   let pending: Promise<void> = Promise.resolve();
@@ -255,9 +242,11 @@ function streamProgress(emit: ProgressEmitter, signal?: AbortSignal): OutputStre
         const line = buffer.slice(0, newline);
         buffer = buffer.slice(newline + 1);
         try {
-          const text = parseOpencodeEvent(line);
+          const text = harness.parseEvent(line);
           if (text) emitText(`[opencode] ${text}`);
-        } catch {
+        } catch (error) {
+          // Error events must propagate so the run fails honestly.
+          if (error instanceof OpenCodeErrorEventImpl) throw error;
           emitText("[opencode] malformed event line (redacted).");
         }
       }
@@ -267,49 +256,6 @@ function streamProgress(emit: ProgressEmitter, signal?: AbortSignal): OutputStre
       await pending;
     },
   };
-}
-
-/**
- * OpenCode uses the native Google endpoint with a dummy key. Sandbox HTTPS
- * egress rewrites provider requests to AI Gateway outside the container.
- * Only the allow-listed provider is enabled.
- */
-export function buildOpencodeConfig(input: CodingTaskInput): Record<string, unknown> {
-  const model = input.codingModel;
-  if (!model.startsWith("google/")) {
-    throw new Error(`Unsupported coding model ${JSON.stringify(model)}: only google/* models are supported.`);
-  }
-  return {
-    $schema: "https://opencode.ai/config.json",
-    model,
-    enabled_providers: ["google"],
-    autoupdate: false,
-    provider: {
-      google: {
-        options: {
-          apiKey: DUMMY_PROVIDER_KEY,
-        },
-      },
-    },
-  };
-}
-
-/**
- * argv for a headless JSON-event run. Callers must quote with shellJoin;
- * never interpolate the task into a shell string by hand.
- */
-export function buildOpencodeArgv(input: CodingTaskInput, workdir: string): string[] {
-  return [
-    "opencode",
-    "run",
-    "--format",
-    "json",
-    "--model",
-    input.codingModel,
-    "--dir",
-    workdir,
-    input.task,
-  ];
 }
 
 function summarizeRun(input: CodingTaskInput, changedFiles: string[], stdoutTail: string): string {
@@ -345,6 +291,26 @@ export function parsePorcelainStatus(output: string): string[] {
   return [...new Set(paths)];
 }
 
+/** Parse `git status --porcelain` output and return deleted file paths. */
+function parsePorcelainDeleted(output: string): Set<string> {
+  const deleted = new Set<string>();
+  for (const line of output.split("\n")) {
+    if (line.length < 4) continue;
+    const statusCode = line.slice(0, 2);
+    // " D" = deleted in worktree, "D " = deleted and staged
+    if (statusCode !== " D" && statusCode !== "D ") continue;
+    const rest = line.slice(3).trim();
+    if (!rest) continue;
+    const arrow = rest.indexOf(" -> ");
+    const path = arrow >= 0 ? rest.slice(arrow + 4) : rest;
+    const unquoted = path.startsWith('"') && path.endsWith('"') ? path.slice(1, -1) : path;
+    if (unquoted && !unquoted.includes("..") && !unquoted.startsWith("/")) {
+      deleted.add(unquoted);
+    }
+  }
+  return deleted;
+}
+
 async function collectChanges(ops: SandboxOps, workdir: string, signal?: AbortSignal): Promise<CollectedChanges> {
   const status = await ops.exec(shellJoin(["git", "status", "--porcelain"]), {
     cwd: workdir,
@@ -355,10 +321,13 @@ async function collectChanges(ops: SandboxOps, workdir: string, signal?: AbortSi
     throw new Error(`git status failed: ${boundTail(status.stderr, 1000)}`);
   }
   const changedFiles = parsePorcelainStatus(status.stdout).slice(0, MAX_CAPTURED_FILES);
-  if (changedFiles.length > 0) {
-    // Intent-to-add makes new files show up in the worktree diff.
+  const deletedFiles = parsePorcelainDeleted(status.stdout);
+  // Intent-to-add makes new files show up in the worktree diff.
+  // Deleted files are already tracked, so they don't need -N.
+  const filesToAdd = changedFiles.filter((path) => !deletedFiles.has(path));
+  if (filesToAdd.length > 0) {
     const add = await ops.exec(
-      ["git", "add", "-N", "--", ...changedFiles].map(shellQuote).join(" "),
+      ["git", "add", "-N", "--", ...filesToAdd].map(shellQuote).join(" "),
       { cwd: workdir, timeoutMs: GIT_TIMEOUT_MS, signal },
     );
     if (add.exitCode !== 0) {
@@ -378,6 +347,8 @@ async function collectChanges(ops: SandboxOps, workdir: string, signal?: AbortSi
   const files: CollectedChanges["files"] = [];
   let totalChars = 0;
   for (const path of changedFiles) {
+    // Skip reading deleted files: they no longer exist on disk.
+    if (deletedFiles.has(path)) continue;
     if (totalChars >= MAX_TOTAL_FILE_CHARS) break;
     const fullPath = `${workdir}/${path}`;
     // The ops layer enforces maxBytes and throws instead of truncating, so a
