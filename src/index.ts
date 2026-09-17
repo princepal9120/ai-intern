@@ -1,7 +1,7 @@
 /**
  * Worker entry. Serves the dashboard from Static Assets, routes Agent
- * traffic, proxies provider calls through AI Gateway, exposes the
- * retained run registry, and verifies GitHub webhooks.
+ * traffic, exposes the retained run registry, and verifies GitHub webhooks.
+ * Provider traffic is intercepted at the Sandbox egress boundary — no callback route.
  */
 import { ContainerProxy, proxyToSandbox, type Sandbox as SandboxBinding } from "@cloudflare/sandbox";
 import { getAgentByName, routeAgentRequest } from "agents/routing";
@@ -10,31 +10,30 @@ import { CodingOrchestrator } from "./agents/orchestrator.js";
 import type { Env } from "./env.js";
 import { Sandbox } from "./sandbox.js";
 import { redactSecrets, verifyGitHubWebhookSignature } from "./security.js";
+import { handleSlackCommand } from "./slack-routes.js";
 
 export { CodingOrchestrator, OpenCodeAgent, Sandbox, ContainerProxy };
 
-const ORCHESTRATOR_NAME = "default";
+export function getUserId(request: Request): string | null {
+  const email = request.headers.get("CF-Access-Authenticated-User-Email");
+  if (!email || email.trim() === "") {
+    return null;
+  }
+  return email;
+}
 
 async function handleRuns(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/runs")) {
     return null;
   }
-  const stub = await getAgentByName(env.CodingOrchestrator, ORCHESTRATOR_NAME);
+  const userId = getUserId(request);
+  if (!userId) {
+    return Response.json({ error: "Authentication required." }, { status: 401 });
+  }
+  const stub = await getAgentByName(env.CodingOrchestrator, userId);
   const rewritten = new Request(new URL(url.pathname + url.search, request.url), request);
   return stub.fetch(rewritten);
-}
-
-async function handleProvider(request: Request): Promise<Response | null> {
-  const url = new URL(request.url);
-  const match = url.pathname.match(/^\/api\/provider\/(google)(?:\/(.*))?$/);
-  if (!match) {
-    return null;
-  }
-  return Response.json(
-    { error: "Provider callback disabled pending authenticated Sandbox egress integration." },
-    { status: 503 },
-  );
 }
 
 async function handleGitHubWebhook(request: Request, env: Env): Promise<Response | null> {
@@ -86,9 +85,9 @@ export default {
       if (runsResponse) {
         return runsResponse;
       }
-      const providerResponse = await handleProvider(request);
-      if (providerResponse) {
-        return providerResponse;
+      const slackResponse = await handleSlackCommand(request, env);
+      if (slackResponse) {
+        return slackResponse;
       }
       const webhookResponse = await handleGitHubWebhook(request, env);
       if (webhookResponse) {
