@@ -5,11 +5,11 @@ description: Diagnose local builds and known integration limitations honestly.
 
 | Symptom | Check or action |
 | --- | --- |
-| Node engine error | Use Node 22.12.0+ and npm 9.6.5+; run npm ci |
-| Missing package export after partial install | Reinstall locked dependencies with npm ci; do not patch node_modules |
+| Node/pnpm engine error | Use Node 22.12.0+ and pnpm 10.0.0+; run pnpm install |
+| Missing package export after partial install | Reinstall locked dependencies with pnpm install; do not patch node_modules |
 | Unknown docs script | Run from the repository root and inspect package.json |
-| Docs search absent in dev | Build and run npm run docs:preview; Pagefind is production-only |
-| Docs 404 or stale output | Run the combined npm run build; Vite alone clears public/docs |
+| Docs search absent in dev | Build and run pnpm docs:preview; Pagefind is production-only |
+| Docs 404 or stale output | Run the combined pnpm build; Vite alone clears public/docs |
 | Vite dashboard cannot connect | Vite has no Worker API/WebSocket proxy; this is UI-only mode |
 | Wrangler/container startup fails | Check the actual error and local container engine; static build success is unrelated |
 | WORKER_ORIGIN is not configured | Current orchestrator requires it, but setting it cannot resolve the disabled callback |
@@ -25,4 +25,5 @@ description: Diagnose local builds and known integration limitations honestly.
 Do not send secrets in bug reports. Include command, dependency versions, bounded redacted error output, expected/actual behavior, and whether the failure is a local build, mocked test, or live integration. Never report a failed dry run as a successful deployment.
 
 See [Readiness](/docs/readiness/) for remaining work and the account-owned acceptance procedure.
+
 

@@ -11,17 +11,17 @@ Describe a proposed change separately from behavior already implemented.
 
 ## Verify locally
 
-Use the Node and npm versions declared in `package.json`:
-Node 22.12.0 or newer and npm 9.6.5 or newer.
+Use the Node and pnpm versions declared in `package.json`:
+Node 22.12.0 or newer and pnpm 10.0.0 or newer.
 Run these commands from the repository root:
 
 ```sh
-npm ci
-npm run typecheck
-npm run lint
-npm test
-npm run docs:check
-npm run build
+pnpm install
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm docs:check
+pnpm build
 npx wrangler deploy --dry-run
 ```
 
@@ -71,3 +71,4 @@ of them requires re-running the live acceptance checklist (T10).
 
 Add a startup assertion so the next retirement fails loudly at deploy rather
 than silently at run time.
+

@@ -1,0 +1,49 @@
+---
+title: Jira Integration
+description: Trigger autonomous coding tasks from Jira issue events and sync test results.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+AI Intern integrates with Jira Cloud and Jira Data Center to convert bug reports, backlog items, and customer issues directly into pull requests.
+
+## How It Works
+
+1. **Jira Webhook Event**: A ticket is created or transitioned to a designated workflow status (e.g. `AI Intern Triage`).
+2. **Issue Extraction**: AI Intern extracts the issue key, summary, description, and repository labels.
+3. **Plan Generation**: The Planner agent checks the target repository and proposes a plan.
+4. **Approval Gate**: If configured, an approval link is commented on the Jira ticket or sent to Slack.
+5. **Sandbox Run**: Claude Code / OpenCode runs in the Cloudflare Sandbox micro-container.
+6. **Ticket Sync**: AI Intern comments the generated git diff, test run logs, and opens a GitHub PR with the Jira issue key in the title (e.g. `PROJ-1234: fix sign-up form`).
+
+## Configuration
+
+<Steps>
+
+1. **Create Jira Webhook**
+   In Jira Settings > System > WebHooks, create a webhook pointing to:
+   ```
+   https://your-worker.workers.dev/api/jira/webhook
+   ```
+
+2. **Set JQL Trigger Filter**
+   Filter issues to only trigger when assigned or labeled:
+   ```sql
+   project = "DEV" AND labels = "ai-intern" AND status = "To Do"
+   ```
+
+3. **Configure Jira Secrets**
+   Set your Jira API token and domain in your Cloudflare environment:
+   ```bash
+   pnpm wrangler secret put JIRA_HOST
+   pnpm wrangler secret put JIRA_EMAIL
+   pnpm wrangler secret put JIRA_API_TOKEN
+   pnpm wrangler secret put JIRA_WEBHOOK_SECRET
+   ```
+
+</Steps>
+
+## Automated Status Transitions
+
+When the PR is opened, AI Intern can automatically advance the Jira issue status to **In Review**, reducing manual ticket maintenance.
+

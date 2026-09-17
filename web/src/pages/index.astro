@@ -1,6 +1,6 @@
 ---
 import '../styles/tailwind.css';
-import '../styles/capy-theme.css';
+import '../styles/theme.css';
 ---
 <!DOCTYPE html>
 <html lang="en" class="dark scroll-smooth">
@@ -17,11 +17,11 @@ import '../styles/capy-theme.css';
     @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Bangers&display=swap');
     
     :root {
-      --capy-primary: #0B9F95;
-      --capy-primary-hover: #0ea5e9;
-      --capy-primary-light: #2dd4bf;
-      --capy-primary-dark: #097d75;
-      --capy-primary-glow: rgba(11, 159, 149, 0.25);
+      --brand-primary: #0B9F95;
+      --brand-primary-hover: #0ea5e9;
+      --brand-primary-light: #2dd4bf;
+      --brand-primary-dark: #097d75;
+      --brand-primary-glow: rgba(11, 159, 149, 0.25);
     }
     body {
       background-color: #08090b !important;
@@ -84,6 +84,46 @@ import '../styles/capy-theme.css';
       color: #4ade80;
       border-left: 2px solid #22c55e;
     }
+
+    @keyframes mascot-float {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-8px) rotate(-2deg); }
+    }
+    @keyframes mascot-breathe {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.06); }
+    }
+    @keyframes mascot-wiggle {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-8deg); }
+      75% { transform: rotate(8deg); }
+    }
+    @keyframes mascot-sway {
+      0%, 100% { transform: rotate(-4deg) translateY(0); }
+      50% { transform: rotate(4deg) translateY(-5px); }
+    }
+    @keyframes mascot-bounce {
+      0%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-12px); }
+      60% { transform: translateY(-4px); }
+    }
+    .mascot-floating {
+      animation: mascot-float 4s ease-in-out infinite;
+    }
+    .mascot-breathing {
+      animation: mascot-breathe 3.2s ease-in-out infinite;
+      transform-origin: bottom center;
+    }
+    .mascot-swaying {
+      animation: mascot-sway 3.5s ease-in-out infinite;
+      transform-origin: top center;
+    }
+    .mascot-bouncing {
+      animation: mascot-bounce 2.6s ease infinite;
+    }
+    .mascot-hover-wiggle:hover {
+      animation: mascot-wiggle 0.5s ease-in-out infinite;
+    }
     .diff-line-del {
       background-color: rgba(239, 68, 68, 0.15);
       color: #f87171;
@@ -142,34 +182,67 @@ import '../styles/capy-theme.css';
   </header>
 
   <main>
-    <!-- HERO SECTION -->
-    <section class="relative pt-16 sm:pt-24 pb-20 overflow-hidden text-center">
-      <div class="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col items-center">
-        <!-- Pill Badge -->
-        <a href="https://github.com/princepal9120/ai-intern" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-zinc-900/80 border border-teal-500/30 text-teal-300 text-xs sm:text-sm font-tech mb-6 hover:border-teal-400 transition-colors shadow-lg">
-          <span class="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
-          <span>MIT Licensed Project on GitHub</span>
-          <span class="font-bold">→</span>
-        </a>
+    <!-- HERO SECTION (Synara-style classical temple atmosphere + animated mascot animations) -->
+    <section class="relative pt-12 sm:pt-20 pb-24 overflow-hidden text-center">
+      <!-- Synara-inspired Temple Ruins & Atmospheric Night Backdrop -->
+      <div class="absolute inset-0 pointer-events-none -z-10 overflow-hidden">
+        <!-- Sky background texture with subtle cosmic blend -->
+        <div class="absolute inset-0 bg-cover bg-center opacity-30 mix-blend-screen filter saturate-150" style="background-image: url('/assets/synara/hero-bg.jpg');"></div>
+        
+        <!-- Classical Greco-Roman temple ruins from Synara, bathed in moonlight and starry skies -->
+        <img
+          src="/assets/synara/hero-temple-night.png"
+          alt="Classical temple ruins backdrop"
+          class="absolute top-0 right-0 sm:-right-8 md:right-0 max-w-4xl lg:max-w-6xl w-full h-auto object-cover opacity-65 -scale-x-100 filter brightness-110 contrast-110"
+          style="mask-image: radial-gradient(ellipse 85% 70% at 75% 35%, black 40%, transparent 85%); -webkit-mask-image: radial-gradient(ellipse 85% 70% at 75% 35%, black 40%, transparent 85%);"
+        />
+        
+        <!-- Atmospheric lighting glows -->
+        <div class="absolute top-10 right-1/4 w-[500px] h-[500px] rounded-full bg-teal-500/15 blur-[120px]"></div>
+        <div class="absolute top-24 left-1/4 w-[400px] h-[400px] rounded-full bg-amber-500/10 blur-[140px]"></div>
+        <div class="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#08090b] to-transparent"></div>
+      </div>
+
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col items-center relative z-10">
+        <!-- Synara-inspired Provider Portability Badge Bar -->
+        <div class="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-zinc-900/90 border border-white/15 backdrop-blur-md text-xs font-tech text-gray-300 mb-8 shadow-xl hover:border-teal-400/40 transition-all">
+          <div class="flex items-center gap-2 border-r border-white/15 pr-3">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-white font-semibold">MULTI-HARNESS READY</span>
+          </div>
+          <div class="flex items-center gap-2.5">
+            <span class="px-2 py-0.5 rounded bg-zinc-800 text-teal-300 font-bold text-[11px]">Claude Code</span>
+            <span class="px-2 py-0.5 rounded bg-zinc-800 text-cyan-300 font-bold text-[11px]">OpenCode</span>
+            <span class="px-2 py-0.5 rounded bg-zinc-800 text-purple-300 font-bold text-[11px]">Codex</span>
+            <span class="px-2 py-0.5 rounded bg-zinc-800 text-amber-300 font-bold text-[11px]">Gemini 2.5 Flash</span>
+          </div>
+        </div>
 
         <!-- Hero Headline -->
-        <h1 class="font-display text-5xl sm:text-7xl md:text-8xl lg:text-9xl tracking-tight text-white uppercase leading-[0.9] max-w-5xl mb-6">
+        <h1 class="font-display text-5xl sm:text-7xl md:text-8xl lg:text-9xl tracking-tight text-white uppercase leading-[0.9] max-w-5xl mb-6 drop-shadow-2xl">
           THE BEST SELF-HOSTED <br class="hidden sm:block" />
           <span class="text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-teal-400 to-cyan-400">AI SOFTWARE ENGINEER</span>
         </h1>
 
-        <!-- Hero Subtitle: Active voice, clear transformation, zero em dashes -->
-        <p class="text-base sm:text-xl md:text-2xl text-gray-300 max-w-3xl font-tech mb-10 leading-relaxed">
+        <!-- Hero Subtitle -->
+        <p class="text-base sm:text-xl md:text-2xl text-gray-200 max-w-3xl font-tech mb-10 leading-relaxed drop-shadow-md">
           Delegate tasks to parallel coding agents that plan, build, and ship from task to reviewable PR.
           Runs entirely inside your own Cloudflare account with isolated micro-containers and approval gates.
         </p>
 
-        <!-- CTA Buttons -->
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 mb-16 w-full max-w-md sm:max-w-none">
-          <a href="/docs/getting-started" class="w-full sm:w-auto relative group flex items-center justify-center gap-3 bg-teal-400 text-black font-display text-2xl tracking-wider px-8 py-4 rounded-2xl comic-btn-shadow border-2 border-teal-300">
-            <span>Install AI Intern</span>
-            <img src="/assets/mascot/doge-sleeping.svg" alt="Hero Image" class="w-10 h-auto transition-transform group-hover:-translate-y-1.5" style="width: 40px; height: 25px;" />
-          </a>
+        <!-- CTA Buttons with animated Resting Mascot -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-6 mb-16 w-full max-w-md sm:max-w-none">
+          <div class="relative group w-full sm:w-auto">
+            <!-- animated mascot sleeping directly on top of button with breathing & hover animation -->
+            <div class="absolute -top-7 right-6 sm:right-4 z-20 pointer-events-none transition-transform duration-300 group-hover:-translate-y-2 group-hover:scale-110">
+              <img src="/assets/mascot/doge-sleeping.svg" alt="Doge resting" class="w-14 h-auto drop-shadow-lg mascot-breathing" style="width: 56px; height: 35px;" />
+            </div>
+            <a href="/docs/getting-started" class="w-full sm:w-auto relative flex items-center justify-center gap-3 bg-teal-400 text-black font-display text-2xl tracking-wider px-9 py-4 rounded-2xl comic-btn-shadow border-2 border-teal-300 hover:bg-teal-300 transition-all">
+              <span>Install AI Intern</span>
+              <span class="text-xl font-bold">→</span>
+            </a>
+          </div>
+
           <a href="https://github.com/princepal9120/ai-intern" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto flex items-center justify-center gap-2 bg-zinc-900/90 text-white font-tech text-base px-7 py-4 rounded-2xl border-2 border-white/15 hover:border-teal-400/50 hover:bg-zinc-800 transition-all shadow-[4px_4px_0px_0px_rgba(255,255,255,0.08)]">
             <span>View Source on GitHub</span>
             <span class="text-teal-400">↗</span>
@@ -206,8 +279,8 @@ import '../styles/capy-theme.css';
           </div>
         </div>
 
-        <!-- NEW FAMOUS DOG MASCOT HERO BATTLESTATION CONTAINER -->
-        <div class="w-full max-w-5xl rounded-2xl overflow-hidden border-2 border-white/20 bg-zinc-950 comic-card-teal relative text-left">
+        <!-- HERO BATTLESTATION CONTAINER WITH MASCOT -->
+        <div class="w-full max-w-5xl rounded-2xl overflow-hidden border-2 border-white/20 bg-zinc-950 comic-card-teal relative text-left shadow-2xl">
           <!-- Window Header -->
           <div class="bg-zinc-900 border-b border-white/10 px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-2">
@@ -221,7 +294,7 @@ import '../styles/capy-theme.css';
             </button>
           </div>
 
-          <!-- Hero Illustration: Famous Dog Mascot at Battlestation -->
+          <!-- Hero Illustration: Dog Mascot at Battlestation -->
           <div class="relative w-full bg-black overflow-hidden flex items-center justify-center p-2 sm:p-4">
             <img src="/assets/mascot/doge-hero-battlestation.svg" alt="Hero Image" class="w-full h-auto object-contain filter contrast-125" style="max-height: 520px;" />
             <div class="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent pointer-events-none"></div>
@@ -254,7 +327,7 @@ import '../styles/capy-theme.css';
         <div class="flex flex-col md:flex-row md:items-end justify-between mb-16">
           <div>
             <div class="inline-flex items-center gap-2 bg-amber-400/10 text-amber-300 border border-amber-400/30 px-3 py-1 rounded-full text-xs font-tech font-bold uppercase mb-4">
-              <img src="/assets/capy/lightbulb.529c5ef0.webp" alt="Light bulb" class="w-4 h-4 object-contain" style="width: 16px; height: 16px;" />
+              <img src="/assets/mascot/doge-mascot-sunglasses.svg" alt="Light bulb" class="w-4 h-4 object-contain" style="width: 16px; height: 16px;" />
               <span>USE CASES</span>
             </div>
             <h2 class="font-display text-3xl sm:text-4xl lg:text-5xl text-white tracking-wide max-w-4xl leading-tight">
@@ -302,7 +375,7 @@ import '../styles/capy-theme.css';
             </div>
             <div class="bg-black/80 rounded-xl p-3.5 border border-white/5 font-tech text-xs space-y-3">
               <div class="flex items-start gap-2.5">
-                <img src="/assets/capy/lisa.9f2cd3d0.webp" alt="lisa" class="w-6 h-6 rounded-full mt-0.5 object-cover" style="width: 24px; height: 24px;" />
+                <img src="/assets/mascot/doge-avatar.svg" alt="AI Intern mascot" class="w-6 h-6 rounded-full mt-0.5 object-cover" style="width: 24px; height: 24px;" />
                 <div>
                   <div class="text-gray-400 text-[11px]"><span class="text-white font-bold">developer</span> 2:47 PM</div>
                   <p class="text-gray-300 text-xs">Can you reproduce and patch this login rate-limit failure?</p>
@@ -351,7 +424,7 @@ import '../styles/capy-theme.css';
             <div>
               <div class="flex items-center justify-between mb-4">
                 <span class="font-tech text-xs bg-emerald-400/10 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded">Refactor</span>
-                <span class="text-xs text-gray-500 font-tech">package-lock.json</span>
+                <span class="text-xs text-gray-500 font-tech">pnpm-lock.yaml</span>
               </div>
               <h3 class="font-display text-2xl text-white tracking-wide mb-2">MIGRATION & REFACTOR</h3>
               <p class="font-tech text-sm text-gray-400 mb-6">Run parallel agents across multiple packages. Offload repetitive migration tasks.</p>
@@ -416,7 +489,6 @@ import '../styles/capy-theme.css';
 
     <!-- MANGA SCENE TRANSITION STRIP (Zero em dashes) -->
     <section class="relative w-full py-16 bg-black overflow-hidden border-y border-white/10">
-      <img src="/assets/capy/use-case-bg.b9d62ab8.webp" alt="Manga cityscape" class="absolute inset-0 w-full h-full object-cover opacity-35" />
       <div class="relative max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-8 z-10">
         <div class="max-w-xl text-left">
           <span class="font-comic text-2xl sm:text-3xl text-teal-400 tracking-wider">KEEP RUNTIMES ISOLATED FROM YOUR LAPTOP.</span>
@@ -518,7 +590,7 @@ import '../styles/capy-theme.css';
                 <h4 class="font-display text-2xl text-white mt-1">FAST FLEXIBLE VMS</h4>
                 <p class="font-tech text-xs text-gray-400 mt-2">Ephemeral micro-containers run your build and test scripts in seconds. Destroyed immediately after exit.</p>
               </div>
-              <img src="/assets/capy/fast-flexible-vms.9f5f57cd.webp" alt="Fast flexible VMs" class="w-full h-auto object-contain mt-4 rounded-lg" style="max-height: 140px;" />
+              <img src="/assets/mascot/doge-hero-battlestation.svg" alt="Fast flexible VMs" class="w-full h-auto object-contain mt-4 rounded-lg" style="max-height: 140px;" />
             </div>
 
             <div class="bg-zinc-900/90 border border-white/10 rounded-2xl p-4 comic-card-shadow flex items-center gap-4">
@@ -582,7 +654,7 @@ import '../styles/capy-theme.css';
       <div class="max-w-7xl mx-auto px-4 sm:px-6">
         <div class="text-center max-w-3xl mx-auto mb-16">
           <div class="inline-flex items-center gap-2 bg-rose-400/10 text-rose-300 border border-rose-400/30 px-3 py-1 rounded-full text-xs font-tech font-bold uppercase mb-4">
-            <img src="/assets/capy/puzzle.524a3791.webp" alt="Puzzle" class="w-4 h-4 object-contain" style="width: 16px; height: 16px;" />
+            <img src="/assets/mascot/doge-climbing.svg" alt="Puzzle" class="w-4 h-4 object-contain" style="width: 16px; height: 16px;" />
             <span>INTEGRATIONS</span>
           </div>
           <h2 class="font-display text-4xl sm:text-6xl text-white tracking-wide">
@@ -649,7 +721,7 @@ import '../styles/capy-theme.css';
         <div class="flex flex-col md:flex-row md:items-end justify-between mb-16">
           <div class="text-left">
             <div class="inline-flex items-center gap-2 bg-teal-400/10 text-teal-300 border border-teal-400/30 px-3 py-1 rounded-full text-xs font-tech font-bold uppercase mb-4">
-              <img src="/assets/capy/circle_briefcase.svg" alt="Security" class="w-4 h-4 object-contain" style="width: 16px; height: 16px;" />
+              <img src="/assets/mascot/doge-sleeping.svg" alt="Security" class="w-4 h-4 object-contain" style="width: 16px; height: 16px;" />
               <span>SECURITY ARCHITECTURE</span>
             </div>
             <h2 class="font-display text-3xl sm:text-4xl lg:text-5xl text-white tracking-wide max-w-3xl leading-tight">
@@ -717,7 +789,7 @@ import '../styles/capy-theme.css';
       <div class="max-w-7xl mx-auto px-4 sm:px-6">
         <div class="text-center max-w-2xl mx-auto mb-16">
           <div class="inline-flex items-center gap-2 bg-emerald-400/10 text-emerald-300 border border-emerald-400/30 px-3 py-1 rounded-full text-xs font-tech font-bold uppercase mb-4">
-            <img src="/assets/capy/circle_card.svg" alt="Card" class="w-4 h-4 object-contain" style="width: 16px; height: 16px;" />
+            <img src="/assets/mascot/doge-riding.svg" alt="Card" class="w-4 h-4 object-contain" style="width: 16px; height: 16px;" />
             <span>TRANSPARENT COSTS</span>
           </div>
           <h2 class="font-display text-3xl sm:text-4xl lg:text-5xl text-white tracking-wide leading-tight">
@@ -837,7 +909,7 @@ import '../styles/capy-theme.css';
 
         <!-- Doge Riding Jetboard Illustration -->
         <div class="mt-14 max-w-sm mx-auto">
-          <img src="/assets/mascot/doge-riding.svg" alt="Doge Riding" class="w-full h-auto object-contain" style="max-height: 220px;" />
+          <img src="/assets/mascot/doge-riding.svg" alt="Doge Riding" class="w-full h-auto object-contain mascot-bouncing mascot-hover-wiggle transition-transform" style="max-height: 220px;" />
         </div>
       </div>
     </section>
@@ -909,5 +981,24 @@ import '../styles/capy-theme.css';
       });
     }
   </script>
+
+  <!-- animated Floating Interactive Mascot Assistant (Bottom-Right) -->
+  <div class="fixed bottom-6 right-6 z-50 flex items-end gap-3 group">
+    <div class="hidden sm:block opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 pointer-events-none bg-zinc-900/95 border border-teal-500/40 text-gray-200 text-xs font-tech px-4 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md max-w-xs">
+      <div class="flex items-center gap-1.5 text-teal-400 font-bold mb-0.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></span>
+        <span>AI INTERN ONLINE</span>
+      </div>
+      <p class="text-[11px] text-gray-300">Self-hosted in your Cloudflare account. Zero SaaS middleman fees.</p>
+    </div>
+    <a href="/docs/getting-started" class="relative block w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 via-teal-400 to-teal-600 p-1.5 shadow-[4px_4px_0px_0px_#0B9F95] hover:shadow-[1px_1px_0px_0px_#0B9F95] hover:translate-x-1 hover:translate-y-1 transition-all mascot-floating" aria-label="Quickstart Guide">
+      <img src="/assets/mascot/doge-mascot-sunglasses.svg" alt="AI Intern Mascot" class="w-full h-full object-contain filter drop-shadow" />
+      <span class="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-400 border-2 border-black rounded-full animate-ping"></span>
+      <span class="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-400 border-2 border-black rounded-full"></span>
+    </a>
+  </div>
+
 </body>
 </html>
+
+

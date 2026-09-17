@@ -20,17 +20,17 @@ The static documentation/dashboard build and mocked tests do not establish that 
 ## Local acceptance
 
 ~~~sh
-npm ci
-npm run typecheck
-npm run lint
-npm test
-npm run docs:check
-npm run build
-npm run docs:verify
+pnpm install
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm docs:check
+pnpm build
+pnpm docs:verify
 npx wrangler deploy --dry-run
 ~~~
 
-Record actual failures, including missing container runtime/image support. Do not replace a dry run with a real deployment to get a green result. Review npm audit findings separately; do not force dependency upgrades without compatibility review.
+Record actual failures, including missing container runtime/image support. Do not replace a dry run with a real deployment to get a green result. Review package audit findings separately; do not force dependency upgrades without compatibility review.
 
 ## Account-owned integration acceptance (not executed by these docs)
 
@@ -47,4 +47,5 @@ After implementing the missing boundaries, use an isolated test installation and
 9. Check keyboard operation, narrow/desktop layouts, docs navigation/search, and missing-path 404 behavior.
 
 Record date, revisions, versions, environment, results, and unresolved failures. Mocked tests alone are insufficient to mark the product complete.
+
 

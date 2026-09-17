@@ -14,41 +14,55 @@ export default defineConfig({
 		starlight({
 			title: 'AI Intern',
 			description:
-				'Self-hosted coding agent on Cloudflare: approval-gated tasks delegated to isolated sandbox containers running OpenCode.',
-			customCss: ['./src/styles/capy-theme.css'],
+				'Open-source multi-agent coding system. Slack/Jira to GitHub PR with approval gates.',
+			logo: {
+				src: './src/assets/logo.svg',
+				alt: 'AI Intern Logo',
+			},
+			favicon: '/favicon.svg',
+			customCss: ['./src/styles/theme.css'],
 			social: [
 				{ icon: 'github', label: 'GitHub', href: 'https://github.com/princepal9120/ai-intern' },
+				{ icon: 'x.com', label: 'Twitter / X', href: 'https://x.com/prince_twets' },
 			],
+			editLink: {
+				baseUrl: 'https://github.com/princepal9120/ai-intern/edit/main/docs/',
+			},
 			sidebar: [
 				{
 					label: 'Get started',
 					items: [
 						{ label: 'Overview', slug: 'docs/overview' },
 						{ label: 'Quickstart', slug: 'docs/getting-started' },
+						{ label: 'Architecture', slug: 'docs/architecture' },
 						{ label: 'Models & pricing', slug: 'docs/costs' },
 					],
 				},
 				{
-					label: 'Agent',
+					label: 'Core Concepts',
 					items: [
-						{ label: 'Tasks & Runs', slug: 'docs/dashboard' },
-						{ label: 'Pull requests', slug: 'docs/github' },
-						{ label: 'Reviews', slug: 'docs/review' },
-						{ label: 'Automations', slug: 'docs/automations' },
+						{ label: 'Multi-Agent Orchestration', slug: 'docs/multi-agent' },
+						{ label: 'Approval Gates', slug: 'docs/approval-gates' },
+						{ label: 'Claude Code & OpenCode', slug: 'docs/claude-code' },
+						{ label: 'Cloudflare Sandbox', slug: 'docs/security' },
 					],
 				},
 				{
-					label: 'Workspace & Sandbox',
+					label: 'Integrations',
 					items: [
-						{ label: 'Cloudflare Sandbox', slug: 'docs/security' },
+						{ label: 'Slack Integration', slug: 'docs/slack' },
+						{ label: 'Jira Integration', slug: 'docs/jira' },
+						{ label: 'GitHub Pull Requests', slug: 'docs/github' },
+						{ label: 'Automations & Cron', slug: 'docs/automations' },
+					],
+				},
+				{
+					label: 'Operations & Dashboard',
+					items: [
+						{ label: 'Tasks & Runs Dashboard', slug: 'docs/dashboard' },
+						{ label: 'Reviews & Code Diff', slug: 'docs/review' },
 						{ label: 'Configuration & Secrets', slug: 'docs/configuration' },
 						{ label: 'Local development', slug: 'docs/local-development' },
-						{ label: 'Architecture', slug: 'docs/architecture' },
-					],
-				},
-				{
-					label: 'Operations & Deployment',
-					items: [
 						{ label: 'Deployment', slug: 'docs/deployment' },
 						{ label: 'Readiness checklist', slug: 'docs/readiness' },
 						{ label: 'Troubleshooting', slug: 'docs/troubleshooting' },
@@ -62,6 +76,6 @@ export default defineConfig({
 					],
 				},
 			],
-			}),
+		}),
 	],
 });

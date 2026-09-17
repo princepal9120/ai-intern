@@ -22,12 +22,12 @@ For direct HTTP integrations outside this code, authenticated gateways use cf-ai
 ## Prepare locally
 
 ~~~sh
-npm ci
-npm run typecheck
-npm run lint
-npm test
-npm run docs:check
-npm run build
+pnpm install
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm docs:check
+pnpm build
 npx wrangler deploy --dry-run
 ~~~
 
@@ -38,15 +38,16 @@ The dry run is packaging validation, not deployment. Record missing Docker, imag
 ~~~sh
 npx wrangler login
 # Configure optional GitHub secrets described in Configuration.
-npm run build
-npm run deploy
+pnpm build
+pnpm deploy
 ~~~
 
-These commands change your Cloudflare account. npm run deploy does not automatically build assets. Wrangler uses ./Dockerfile for the image and ./public for assets; the dashboard is at / and docs at /docs/. Static missing paths use 404-page rather than an SPA catch-all.
+These commands change your Cloudflare account. pnpm deploy does not automatically build assets. Wrangler uses ./Dockerfile for the image and ./public for assets; the dashboard is at / and docs at /docs/. Static missing paths use 404-page rather than an SPA catch-all.
 
 Protect every reachable hostname, including alternate workers.dev routes, with reviewed authentication. Browser login alone does not authenticate service callbacks. Never make a provider callback public to work around Access. Complete the [acceptance procedure](/docs/readiness/) in an isolated test installation before inviting users.
 
 ## Updates and recovery
 
 Preserve the previous revision and lockfile. Re-run checks, review Durable Object migrations, and validate in a test installation. Code rollback does not automatically restore Durable Object data or undo GitHub branches/PRs. Avoid deleting runtime data as part of a routine docs update.
+
 

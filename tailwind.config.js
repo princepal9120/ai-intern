@@ -13,7 +13,7 @@ export default {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       colors: {
-        capy: {
+        brand: {
           DEFAULT: '#0B9F95',
           light: '#2dd4bf',
           dark: '#097d75',

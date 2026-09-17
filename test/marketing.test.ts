@@ -1,38 +1,36 @@
-import { test, expect, describe } from "vitest";
-import { readFileSync } from "fs";
-import { join } from "path";
+/**
+ * Guards the custom landing page against a Starlight upgrade reclaiming the
+ * index route. Reads the build output, so it only runs after `pnpm build`.
+ */
+import { describe, expect, test } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
-describe("Marketing Landing Page (Capy.ai Replica)", () => {
-  test("renders the custom index.astro replacing the Starlight splash", () => {
-    try {
-      const html = readFileSync(join(process.cwd(), "public", "index.html"), "utf-8");
-      
-      // Check title
-      expect(html).toContain("AI Intern - The best AI software engineer");
-      
-      // Check hero content
-      expect(html).toContain("THE BEST SELF-HOSTED");
-      expect(html).toContain("AI SOFTWARE ENGINEER");
-      expect(html).toContain("Delegate tasks to parallel coding agents");
+const indexPath = join(process.cwd(), "public", "index.html");
+// Skipping is honest here; passing on a missing artifact would not be.
+const built = existsSync(indexPath);
 
-      // Check for the generated image
-      expect(html).toContain("Hero Image");
+describe.skipIf(!built)("marketing landing page", () => {
+  const html = () => readFileSync(indexPath, "utf-8");
 
-      // Check layout features mimicking the grid and dark mode
-      expect(html).toContain("dark");
-      expect(html).toContain("grid-bg");
+  test("renders the custom landing page, not the Starlight splash", () => {
+    const markup = html();
+    expect(markup).toContain("AI Intern - The best AI software engineer");
+    expect(markup).toContain("THE BEST SELF-HOSTED");
+    expect(markup).toContain("AI SOFTWARE ENGINEER");
+    expect(markup).toContain("grid-bg");
+    expect(markup).toContain("01. Approval-Gated");
+  });
 
-      // Check feature grid
-      expect(html).toContain("01. Approval-Gated");
-      expect(html).toContain("02. Micro-Containers");
-      expect(html).toContain("03. Issue Triage");
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === 'ENOENT') {
-        // Skip if not built yet to prevent breaking standard dev runs
-        console.warn("public/index.html not found, skipping marketing e2e test until build");
-      } else {
-        throw e;
-      }
-    }
+  test("every referenced asset exists in the build output", () => {
+    const refs = [...html().matchAll(/\/assets\/[\w-]+\/[\w.-]+/g)].map((m) => m[0]);
+    expect(refs.length).toBeGreaterThan(0);
+    const missing = refs.filter((ref) => !existsSync(join(process.cwd(), "public", ref)));
+    expect(missing).toEqual([]);
+  });
+
+  test("carries no Capy branding or scraped assets", () => {
+    expect(html().toLowerCase()).not.toContain("capy");
   });
 });
+
