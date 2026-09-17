@@ -11,7 +11,7 @@
   "vars": {
     "GATEWAY_ID": "default",
     "ORCHESTRATOR_MODEL": "@cf/meta/llama-3.1-8b-instruct",
-    "CODING_MODEL": "google/gemini-2.0-flash",
+    "CODING_MODEL": "google/gemini-3.5-flash-lite",
     "RUNTIME": "sandbox",
   },
   "ai": {
@@ -29,8 +29,13 @@
       "class_name": "Sandbox",
       "name": "ai-intern-sandbox",
       "image": "./Dockerfile",
-      "max_instances": 3,
+      "instance_type": "standard-1",
+      "max_instances": 5,
     },
   ],
-  "migrations": [{ "tag": "v1", "new_classes": ["CodingOrchestrator", "OpenCodeAgent", "Sandbox"] }],
+  // T18: 5-minute floor tick driving the automations scheduled() fan-out.
+  // Per-automation crons live in the Automations DO; missed ticks coalesce
+  // into one run (see src/automations.ts isScheduleDue).
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CodingOrchestrator", "OpenCodeAgent", "Sandbox"] }],
 }
