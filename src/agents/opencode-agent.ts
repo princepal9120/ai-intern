@@ -14,6 +14,7 @@ import {
 } from "ai";
 import type { Env } from "../env.js";
 import { publishFilesAsPullRequest } from "../github.js";
+import { allowedHostsFor, resolveHarness } from "../harness/index.js";
 import {
   formatAgentResult,
   parseAgentToolInput,
@@ -26,13 +27,21 @@ import {
   type ProgressEvent,
   type SandboxOps,
 } from "../runtime.js";
-import { boundTail, redactSecrets } from "../security.js";
+import { boundTail, parseGitHubRepoUrl, redactSecrets } from "../security.js";
 import { messageText, renderRunTranscript } from "../transcript.js";
 
-export function createSandboxOps(env: Env, sandboxId: string): SandboxOps {
+export function createSandboxOps(env: Env, sandboxId: string, egressHosts?: string[]): SandboxOps {
   const sandbox = getSandbox(env.Sandbox, sandboxId);
   return {
     async gitCheckout(repoUrl, opts) {
+      // The clone runs before anything else, so it is where this run's egress
+      // is pinned down: the selected harness's hosts only (T22), and the
+      // GitHub credential scoped to this one repo (B6).
+      if (egressHosts && egressHosts.length > 0) {
+        await sandbox.approveHarnessEgress(egressHosts);
+      }
+      const { owner, repo } = parseGitHubRepoUrl(repoUrl);
+      await sandbox.approveRepoScope(`/${owner}/${repo}`);
       await sandbox.gitCheckout(repoUrl, { branch: opts.branch, targetDir: opts.targetDir });
     },
     async writeFile(path, content) {
@@ -146,8 +155,14 @@ export class OpenCodeAgent extends AIChatAgent<Env> {
           if (input.publishPullRequest && !this.env.GITHUB_TOKEN) {
             throw new Error("publishPullRequest was requested but GITHUB_TOKEN is not configured.");
           }
-          const adapter = createRuntimeAdapter(resolveRuntimeName(this.env.RUNTIME));
-          const result = await adapter.runCodingTask(createSandboxOps(this.env, input.sandboxId), input, emit, { signal });
+          const harness = resolveHarness(this.env.AGENT_HARNESS);
+          const adapter = createRuntimeAdapter(resolveRuntimeName(this.env.RUNTIME), harness);
+          const ops = createSandboxOps(
+            this.env,
+            input.sandboxId,
+            allowedHostsFor(harness, input.codingModel),
+          );
+          const result = await adapter.runCodingTask(ops, input, emit, { signal });
           checkCancelled();
           let pullUrl: string | undefined;
           if (result.status === "completed" && input.publishPullRequest) {

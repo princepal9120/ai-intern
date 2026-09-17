@@ -17,7 +17,7 @@ vi.mock("../src/github.js", () => ({ publishFilesAsPullRequest: mocks.publish })
 const INPUT: CodingTaskInput = {
   repoUrl: "https://github.com/owner/repo", task: "Fix it.", baseBranch: "main",
   publishPullRequest: false, sandboxId: "run-abcdef12345678",
-  codingModel: "google/gemini-2.0-flash", providerBaseUrl: "https://example.workers.dev/api/provider/google",
+  codingModel: "google/gemini-2.0-flash",
 };
 const RESULT: CodingTaskResult = {
   status: "completed", exitCode: 0, stderrTail: "", changedFiles: ["a.ts"],
@@ -175,6 +175,41 @@ describe("createSandboxOps", () => {
     mocks.sandbox.mockReturnValue({ readFileStream: vi.fn().mockResolvedValue(new ReadableStream()) });
     mocks.decodeFile.mockImplementation(async function* () { yield "x".repeat(500_001); });
     await expect(createSandboxOps({} as never, INPUT.sandboxId).readFile("large.txt")).rejects.toThrow("limit");
+  });
+
+  it("scopes the GitHub credential to the run's repo before cloning (B6)", async () => {
+    const calls: string[] = [];
+    const approveRepoScope = vi.fn(async () => { calls.push("approve"); });
+    const gitCheckout = vi.fn(async () => { calls.push("clone"); });
+    mocks.sandbox.mockReturnValue({ approveRepoScope, gitCheckout });
+    await createSandboxOps({} as never, INPUT.sandboxId)
+      .gitCheckout("https://github.com/owner/repo", { branch: "main", targetDir: "/workspace" });
+    expect(approveRepoScope).toHaveBeenCalledWith("/owner/repo");
+    // Scoping must precede the clone, or the clone itself runs unscoped.
+    expect(calls).toEqual(["approve", "clone"]);
+  });
+
+  it("narrows egress to the selected harness's hosts before cloning (T22)", async () => {
+    const calls: string[] = [];
+    const approveHarnessEgress = vi.fn(async () => { calls.push("egress"); });
+    const approveRepoScope = vi.fn(async () => { calls.push("scope"); });
+    const gitCheckout = vi.fn(async () => { calls.push("clone"); });
+    mocks.sandbox.mockReturnValue({ approveHarnessEgress, approveRepoScope, gitCheckout });
+    await createSandboxOps({} as never, INPUT.sandboxId, ["api.anthropic.com", "github.com"])
+      .gitCheckout("https://github.com/owner/repo", { branch: "main", targetDir: "/workspace" });
+    expect(approveHarnessEgress).toHaveBeenCalledWith(["api.anthropic.com", "github.com"]);
+    expect(calls).toEqual(["egress", "scope", "clone"]);
+  });
+
+  it("refuses to clone a non-GitHub repo rather than scoping nothing", async () => {
+    const approveRepoScope = vi.fn();
+    const gitCheckout = vi.fn();
+    mocks.sandbox.mockReturnValue({ approveRepoScope, gitCheckout });
+    await expect(
+      createSandboxOps({} as never, INPUT.sandboxId)
+        .gitCheckout("https://evil.example.com/owner/repo", { branch: "main", targetDir: "/workspace" }),
+    ).rejects.toThrow();
+    expect(gitCheckout).not.toHaveBeenCalled();
   });
 
   it("forwards execution cancellation and preserves process exit code", async () => {

@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ExecutionContext } from "@cloudflare/workers-types";
 import { Sandbox } from "../src/sandbox.js";
 
 vi.mock("@cloudflare/sandbox", () => ({
@@ -182,8 +183,18 @@ describe("opencode config and argv", () => {
     expect(options?.options).not.toHaveProperty("baseURL");
   });
 
-  it("rejects non-google coding models", () => {
-    expect(() => buildOpencodeConfig({ ...INPUT, codingModel: "openai/gpt-5" })).toThrow();
+  it("accepts any provider the harness supports (T23 fixes B11)", () => {
+    const config = buildOpencodeConfig({ ...INPUT, codingModel: "openai/gpt-5" });
+    expect(config.enabled_providers).toEqual(["openai"]);
+    expect((config.provider as Record<string, { options: { apiKey: string } }>).openai?.options.apiKey)
+      .toBe("ai-intern-dummy-key");
+  });
+
+  it("refuses a provider the harness cannot drive, and a model with no provider", () => {
+    expect(() => buildOpencodeConfig({ ...INPUT, codingModel: "mistral/large" }))
+      .toThrow(/supports google, anthropic, openai/);
+    expect(() => buildOpencodeConfig({ ...INPUT, codingModel: "gemini-3.5-flash-lite" }))
+      .toThrow(/expected "provider\/model"/);
   });
 
   it("builds a headless JSON argv array", () => {
@@ -287,11 +298,13 @@ describe("sandbox HTTPS egress", () => {
   it.each([undefined, "github-worker-secret"])("authenticates GitHub only with a configured token (%s)", async (token) => {
     const fetchMock = vi.fn().mockResolvedValue(new Response("git advertisement"));
     vi.stubGlobal("fetch", fetchMock);
-    await Sandbox.outboundByHost["github.com"](
+    // github.com is credentialed only through the per-run scoped handler (B6).
+    await Sandbox.outboundHandlers.githubScoped(
       new Request("https://github.com/owner/repo.git/info/refs?service=git-upload-pack", {
         headers: { Authorization: "Bearer container-token" },
       }),
       env(token),
+      { params: { allowedPath: "/owner/repo" } } as never,
     );
     const [url, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
     expect(url.toString()).toBe("https://github.com/owner/repo.git/info/refs?service=git-upload-pack");
@@ -315,8 +328,26 @@ describe("sandbox HTTPS egress", () => {
   it("keeps authenticated fetch errors out of responses and logs", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Authorization: worker-only-secret")));
     const logs = [vi.spyOn(console, "error"), vi.spyOn(console, "warn"), vi.spyOn(console, "log")];
-    for (const [host, handler] of Object.entries(Sandbox.outboundByHost)) {
-      const response = await handler(new Request(`https://${host}/`), env("worker-only-secret"));
+    // Both credentialed forwarders, each reached the way a real run reaches it.
+    const attempts: [Request, Promise<Response>][] = [
+      [
+        new Request("https://generativelanguage.googleapis.com/"),
+        Sandbox.outboundByHost["generativelanguage.googleapis.com"](
+          new Request("https://generativelanguage.googleapis.com/"),
+          env("worker-only-secret"),
+        ),
+      ],
+      [
+        new Request("https://github.com/owner/repo.git/info/refs"),
+        Sandbox.outboundHandlers.githubScoped(
+          new Request("https://github.com/owner/repo.git/info/refs"),
+          env("worker-only-secret"),
+          { params: { allowedPath: "/owner/repo" } } as never,
+        ),
+      ],
+    ];
+    for (const [, pending] of attempts) {
+      const response = await pending;
       expect(response.status).toBe(502);
       expect(await response.text()).not.toContain("worker-only-secret");
     }
@@ -507,7 +538,7 @@ describe("sandbox sleep tail (T11 — B9)", () => {
   it("sleeps after 1m to cut the idle compute tail", () => {
     // PLAN.md §7 T11: sleepAfter = "10m" + unique sandbox id per task means a
     // 5-minute task bills 15 container-minutes. "1m" cuts compute ~57%.
-    expect(new Sandbox().sleepAfter).toBe("1m");
+    expect(new Sandbox(null as any, null as any).sleepAfter).toBe("1m");
   });
 });
 
@@ -556,8 +587,9 @@ describe("worker authentication gate (T7)", () => {
       Sandbox: {},
       ASSETS: { fetch: async () => new Response("assets") },
       REQUIRE_ACCESS: "1",
+      ctx: { waitUntil: vi.fn() } as unknown as ExecutionContext,
       ...extra,
-    } as unknown as Env;
+    } as unknown as Env & { ctx: ExecutionContext };
   }
 
   it("exposes SIGNATURE_AUTHENTICATED exemptions for slack and github webhook", async () => {

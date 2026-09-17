@@ -53,7 +53,8 @@ describe("run registry", () => {
   });
 
   it("counts only active runs toward the concurrency limit", () => {
-    expect(MAX_CONCURRENT_RUNS).toBe(3);
+    // Policy value, kept in step with max_instances in wrangler.jsonc.
+    expect(MAX_CONCURRENT_RUNS).toBe(5);
     expect(isActiveStatus("pending")).toBe(true);
     expect(isActiveStatus("running")).toBe(true);
     expect(isActiveStatus("completed")).toBe(false);
@@ -137,14 +138,16 @@ describe("run registry", () => {
     expect(countActiveRuns([])).toBe(0);
     expect(canStartRun([])).toBe(true);
     const runs = Array.from({ length: MAX_CONCURRENT_RUNS + 1 }, (_, index) => makeRun(`r${index}`));
-    expect(countActiveRuns(runs)).toBe(4);
+    expect(countActiveRuns(runs)).toBe(MAX_CONCURRENT_RUNS + 1);
     expect(canStartRun(runs)).toBe(false);
   });
 
-  it("refuses a fourth concurrent run", () => {
-    const runs = [makeRun("a", "running"), makeRun("b", "running"), makeRun("c", "pending")];
+  it("refuses the run past the concurrency limit and frees a slot on cancel", () => {
+    const runs = Array.from({ length: MAX_CONCURRENT_RUNS }, (_, index) =>
+      makeRun(`r${index}`, index === MAX_CONCURRENT_RUNS - 1 ? "pending" : "running"),
+    );
     expect(canStartRun(runs)).toBe(false);
-    const freed = [...runs.slice(0, 2), makeRun("c", "cancelled")];
+    const freed = [...runs.slice(0, -1), makeRun("last", "cancelled")];
     expect(canStartRun(freed)).toBe(true);
   });
 });

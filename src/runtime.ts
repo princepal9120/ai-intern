@@ -12,7 +12,6 @@
 import type { CodingTaskInput, CodingTaskResult } from "./opencode-input.js";
 import { OpenCodeErrorEvent as OpenCodeErrorEventImpl, opencodeHarness } from "./harness/opencode.js";
 import type { AgentHarness } from "./harness/types.js";
-import { DUMMY_PROVIDER_KEY } from "./provider-gateway.js";
 import { boundTail, redactSecrets, shellJoin, shellQuote } from "./security.js";
 
 export const MAX_DIFF_CHARS = 120_000;
@@ -87,7 +86,7 @@ export class SandboxRuntimeAdapter implements RuntimeAdapter {
     opts?: { signal?: AbortSignal },
   ): Promise<CodingTaskResult> {
     const workdir = `/workspace/${input.sandboxId}`;
-    const configPath = `/workspace/${input.sandboxId}.opencode.json`;
+    const config = this.harness.configFile(input, input.sandboxId);
 
     throwIfAborted(opts?.signal);
     await emit({ phase: "clone", message: `Cloning ${input.repoUrl} (branch ${input.baseBranch}).`, fraction: 0.05 });
@@ -100,7 +99,7 @@ export class SandboxRuntimeAdapter implements RuntimeAdapter {
     await emit({ phase: "configure", message: "Writing isolated OpenCode config.", fraction: 0.15 });
     throwIfAborted(opts?.signal);
     try {
-      await ops.writeFile(configPath, JSON.stringify(this.harness.buildConfig(input), null, 2));
+      if (config) await ops.writeFile(config.path, config.contents);
     } catch (error) {
       return failureResult(`Config write failed: ${shortError(error)}`, 0, "");
     }
@@ -116,11 +115,9 @@ export class SandboxRuntimeAdapter implements RuntimeAdapter {
         timeoutMs: OPENCODE_TIMEOUT_MS,
         signal: opts?.signal,
         onOutput: output.onData,
-        env: {
-          OPENCODE_CONFIG: configPath,
-          OPENCODE_DISABLE_AUTOUPDATE: "true",
-          GOOGLE_GENERATIVE_AI_API_KEY: DUMMY_PROVIDER_KEY,
-        },
+        // Provider keys here are always the dummy; the real credential is
+        // swapped in outside the container (src/egress.ts).
+        env: this.harness.env(input, config?.path ?? null),
       });
       await output.finish();
       throwIfAborted(opts?.signal);
@@ -174,8 +171,16 @@ export function resolveRuntimeName(raw: string | undefined): "sandbox" | "comput
   throw new Error(`Unknown RUNTIME ${JSON.stringify(raw)}: expected "sandbox" or "computer".`);
 }
 
-export function createRuntimeAdapter(name: "sandbox" | "computer"): RuntimeAdapter {
-  return name === "computer" ? new ComputerPreviewAdapter() : new SandboxRuntimeAdapter();
+/**
+ * The harness must reach the adapter that actually runs it: egress is
+ * narrowed to the selected harness's host, so running a different one would
+ * block its own provider.
+ */
+export function createRuntimeAdapter(
+  name: "sandbox" | "computer",
+  harness: AgentHarness = opencodeHarness,
+): RuntimeAdapter {
+  return name === "computer" ? new ComputerPreviewAdapter() : new SandboxRuntimeAdapter(harness);
 }
 
 function failureResult(summary: string, exitCode: number, stderrTail: string): CodingTaskResult {
