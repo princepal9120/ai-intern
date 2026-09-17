@@ -57,3 +57,17 @@ Deployment, pushing commits, and opening pull requests are external actions;
 local verification does not authorize them. State what was tested without
 claiming live acceptance from a static build.
 The project declares the MIT license in `package.json` and `LICENSE`.
+
+## Release hygiene
+
+These versions are pinned because they couple to runtime behavior. Bumping any
+of them requires re-running the live acceptance checklist (T10).
+
+| Package | Version | Why it matters |
+|---|---|---|
+| `opencode-ai` | `1.18.31` | `parseOpencodeEvent` couples to the JSON event format. A stream-format change breaks progress parsing silently. |
+| `@cloudflare/sandbox` | `0.12.9` | Must match the base image tag in `Dockerfile`. The `interceptHttps` + `outboundByHost` mechanism is the "no credentials in the container" guarantee. |
+| `CODING_MODEL` | `google/gemini-3.5-flash-lite` | Model ids retire. A retired model fails silently at run time. |
+
+Add a startup assertion so the next retirement fails loudly at deploy rather
+than silently at run time.
