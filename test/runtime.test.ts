@@ -475,6 +475,14 @@ describe("runtime seam", () => {
   });
 });
 
+describe("sandbox sleep tail (T11 — B9)", () => {
+  it("sleeps after 1m to cut the idle compute tail", () => {
+    // PLAN.md §7 T11: sleepAfter = "10m" + unique sandbox id per task means a
+    // 5-minute task bills 15 container-minutes. "1m" cuts compute ~57%.
+    expect(new Sandbox().sleepAfter).toBe("1m");
+  });
+});
+
 describe("per-user orchestrator isolation", () => {
   function makeEnv() {
     return {

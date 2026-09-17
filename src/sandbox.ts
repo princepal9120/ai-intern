@@ -75,7 +75,7 @@ async function forwardGitHub(request: Request, env: EgressEnv): Promise<Response
 
 export class Sandbox<Env = WorkerEnv> extends SandboxBase<Env> {
   override defaultPort = 3000;
-  override sleepAfter = "10m";
+  override sleepAfter = "1m";
   override interceptHttps = true;
 
   static override get outboundByHost() {
