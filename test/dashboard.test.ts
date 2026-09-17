@@ -38,7 +38,7 @@ vi.mock("ai", () => ({
     typeof part.type === "string" && part.type.startsWith("tool-"),
 }));
 
-import { App } from "../dashboard/app";
+import { App } from "../dashboard/src/app";
 import { TaskForm } from "../web/src/components/TaskForm";
 
 afterEach(() => {

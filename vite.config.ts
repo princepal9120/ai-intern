@@ -8,7 +8,7 @@ export default defineConfig({
     target: "es2022",
     sourcemap: false,
     rolldownOptions: {
-      input: ["dashboard/app/index.html"],
+      input: ["app/index.html"],
     },
   },
   esbuild: {
