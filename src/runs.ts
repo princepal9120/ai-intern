@@ -78,3 +78,48 @@ export function countActiveRuns(runs: DelegatedRun[]): number {
 export function canStartRun(runs: DelegatedRun[]): boolean {
   return countActiveRuns(runs) < MAX_CONCURRENT_RUNS;
 }
+
+/**
+ * Owns the find/map/replace pattern against the retained run list so callers
+ * (orchestrator transitions, the run-detail route) don't each re-derive it.
+ * State storage itself stays injected — the store doesn't know it's a
+ * Durable Object.
+ */
+export class RunStore {
+  constructor(
+    private readonly read: () => DelegatedRun[],
+    private readonly write: (runs: DelegatedRun[]) => void,
+  ) {}
+
+  list(): DelegatedRun[] {
+    return this.read();
+  }
+
+  get(runId: string): DelegatedRun | null {
+    return this.read().find((run) => run.runId === runId) ?? null;
+  }
+
+  add(run: DelegatedRun): void {
+    this.write([...this.read(), run]);
+  }
+
+  transition(
+    runId: string,
+    status: RunStatus,
+    patch?: { summary?: string; error?: string },
+  ): DelegatedRun | null {
+    let updated: DelegatedRun | null = null;
+    this.write(
+      this.read().map((run) => {
+        if (run.runId !== runId) return run;
+        updated = transitionRun(run, status, patch);
+        return updated;
+      }),
+    );
+    return updated;
+  }
+
+  clear(): void {
+    this.write([]);
+  }
+}

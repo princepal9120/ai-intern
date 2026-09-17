@@ -60,14 +60,6 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
     );
   }
 
-  private runs(): DelegatedRun[] {
-    return this.state?.runs ?? [];
-  }
-
-  private saveRuns(runs: DelegatedRun[]): void {
-    this.setState({ runs });
-  }
-
   override getModel(): string {
     return this.env.ORCHESTRATOR_MODEL || DEFAULT_ORCHESTRATOR_MODEL;
   }
