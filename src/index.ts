@@ -10,6 +10,7 @@ import { CodingOrchestrator } from "./agents/orchestrator.js";
 import type { Env } from "./env.js";
 import { Sandbox } from "./sandbox.js";
 import { redactSecrets, verifyGitHubWebhookSignature } from "./security.js";
+import { handleSlackEvents } from "./slack-events.js";
 import { handleSlackCommand } from "./slack-routes.js";
 
 export { CodingOrchestrator, OpenCodeAgent, Sandbox, ContainerProxy };
@@ -22,15 +23,28 @@ export function getUserId(request: Request): string | null {
   return email;
 }
 
+// Signature-authenticated paths must not sit behind Access; Slack and GitHub
+// cannot complete an Access login. Write the exemption with T7, not T12.
+export const SIGNATURE_AUTHENTICATED = ["/api/slack/", "/api/github/webhook"];
+
+export function isAuthenticated(request: Request, env: Env): boolean {
+  const { pathname } = new URL(request.url);
+  if (SIGNATURE_AUTHENTICATED.some((p) => pathname.startsWith(p))) return true;
+  if (!env.REQUIRE_ACCESS) return true; // opt-out for `wrangler dev`
+  return request.headers.has("cf-access-authenticated-user-email");
+}
+
 async function handleRuns(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/runs")) {
     return null;
   }
-  const userId = getUserId(request);
-  if (!userId) {
+  if (!isAuthenticated(request, env)) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
+  // With REQUIRE_ACCESS set, isAuthenticated already guarantees the header.
+  // Without it (wrangler dev), fall back to the shared "default" orchestrator.
+  const userId = getUserId(request) ?? "default";
   const stub = await getAgentByName(env.CodingOrchestrator, userId);
   const rewritten = new Request(new URL(url.pathname + url.search, request.url), request);
   return stub.fetch(rewritten);
@@ -71,7 +85,7 @@ async function handleGitHubWebhook(request: Request, env: Env): Promise<Response
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       // proxyToSandbox only needs the Sandbox binding; adapt the type.
       const sandboxEnv = {
@@ -85,6 +99,10 @@ export default {
       if (runsResponse) {
         return runsResponse;
       }
+      const slackEventsResponse = await handleSlackEvents(request, env, ctx);
+      if (slackEventsResponse) {
+        return slackEventsResponse;
+      }
       const slackResponse = await handleSlackCommand(request, env);
       if (slackResponse) {
         return slackResponse;
@@ -92,6 +110,14 @@ export default {
       const webhookResponse = await handleGitHubWebhook(request, env);
       if (webhookResponse) {
         return webhookResponse;
+      }
+      // Layer 2 — fail closed in the Worker. Access gate for the agent
+      // WebSocket/HTTP routes and the dashboard assets. Signature-
+      // authenticated Slack/GitHub routes already returned above.
+      // NOTE: header check is not JWT verification; the route must stay
+      // behind Access. JWT verification is filed as v0.2.
+      if (!isAuthenticated(request, env)) {
+        return Response.json({ error: "Authentication required." }, { status: 401 });
       }
       const agentResponse = await routeAgentRequest(request, env);
       if (agentResponse) {

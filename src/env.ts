@@ -21,8 +21,6 @@ export interface Env {
   CODING_MODEL: string;
   /** Account id that owns the AI Gateway. Required for provider calls. */
   CF_ACCOUNT_ID?: string;
-  /** Public origin of this Worker, e.g. https://ai-intern.example.workers.dev. */
-  WORKER_ORIGIN?: string;
   /** "sandbox" (default) or "computer" (preview-only refusal). */
   RUNTIME?: string;
   /** Optional. Required only to open pull requests. Never sent to containers. */
@@ -31,4 +29,9 @@ export interface Env {
   AI_GATEWAY_TOKEN?: string;
   /** Optional. Verifies incoming GitHub webhook signatures. */
   GITHUB_WEBHOOK_SECRET?: string;
+  /**
+   * Optional. When set, require Cloudflare Access identity on every path
+   * except SIGNATURE_AUTHENTICATED. Unset for `wrangler dev`.
+   */
+  REQUIRE_ACCESS?: string;
 }

@@ -324,6 +324,26 @@ describe("sandbox HTTPS egress", () => {
   });
 });
 
+describe("sandbox egress allowlist (T5)", () => {
+  it("deny-by-default allowlist contains both intercepted hosts plus codeload", () => {
+    // PLAN.md §6 T5: allowedHosts is evaluated before outbound handlers.
+    // Anything unlisted cannot leave the container, including from
+    // repository code OpenCode runs.
+    expect(Sandbox.allowedHosts).toEqual([
+      "generativelanguage.googleapis.com",
+      "github.com",
+      "codeload.github.com", // git clone fetches packs here
+    ]);
+  });
+
+  it("refuses a non-listed host", () => {
+    expect(Sandbox.allowedHosts).not.toContain("attacker.example");
+    // Deliberately shipped without npm registry: enabling `npm install`
+    // inside runs is the widest exfiltration channel on the list (T5).
+    expect(Sandbox.allowedHosts).not.toContain("registry.npmjs.org");
+  });
+});
+
 describe("streamed opencode progress", () => {
   it("emits bounded progress from streamed stdout JSON events", async () => {
     const ops = makeFakeOps();
@@ -512,8 +532,123 @@ describe("per-user orchestrator isolation", () => {
     vi.mocked(proxyToSandbox).mockResolvedValue(null);
     vi.mocked(getAgentByName).mockClear();
     const worker = (await import("../src/index.js")).default;
-    const res = await worker.fetch(new Request("https://example.com/api/runs"), makeEnv());
+    const res = await worker.fetch(
+      new Request("https://example.com/api/runs"),
+      { ...makeEnv(), REQUIRE_ACCESS: "1" },
+    );
     expect(res.status).toBe(401);
     expect(getAgentByName).not.toHaveBeenCalled();
+  });
+});
+
+describe("worker authentication gate (T7)", () => {
+  function makeAccessEnv(extra: Record<string, unknown> = {}) {
+    return {
+      CodingOrchestrator: {},
+      Sandbox: {},
+      ASSETS: { fetch: async () => new Response("assets") },
+      REQUIRE_ACCESS: "1",
+      ...extra,
+    } as unknown as Env;
+  }
+
+  it("exposes SIGNATURE_AUTHENTICATED exemptions for slack and github webhook", async () => {
+    const mod = await import("../src/index.js");
+    expect(mod.SIGNATURE_AUTHENTICATED).toContain("/api/slack/");
+    expect(mod.SIGNATURE_AUTHENTICATED).toContain("/api/github/webhook");
+  });
+
+  it("isAuthenticated exempts signature-authenticated paths without an Access header", async () => {
+    const mod = await import("../src/index.js");
+    const env = makeAccessEnv();
+    expect(mod.isAuthenticated(new Request("https://example.com/api/slack/events"), env)).toBe(true);
+    expect(mod.isAuthenticated(new Request("https://example.com/api/slack/command"), env)).toBe(true);
+    expect(mod.isAuthenticated(new Request("https://example.com/api/github/webhook"), env)).toBe(true);
+    expect(mod.isAuthenticated(new Request("https://example.com/api/runs"), env)).toBe(false);
+  });
+
+  it("with REQUIRE_ACCESS, unauthenticated /api/runs → 401", async () => {
+    vi.mocked(proxyToSandbox).mockResolvedValue(null);
+    vi.mocked(getAgentByName).mockClear();
+    const worker = (await import("../src/index.js")).default;
+    const res = await worker.fetch(new Request("https://example.com/api/runs"), makeAccessEnv());
+    expect(res.status).toBe(401);
+    expect(getAgentByName).not.toHaveBeenCalled();
+  });
+
+  it("without REQUIRE_ACCESS, unauthenticated /api/runs succeeds (wrangler dev opt-out)", async () => {
+    vi.mocked(proxyToSandbox).mockResolvedValue(null);
+    const stubFetch = vi.fn().mockResolvedValue(new Response("routed"));
+    vi.mocked(getAgentByName).mockResolvedValue({ fetch: stubFetch } as never);
+    const worker = (await import("../src/index.js")).default;
+    const res = await worker.fetch(
+      new Request("https://example.com/api/runs"),
+      {
+        CodingOrchestrator: {},
+        Sandbox: {},
+        ASSETS: { fetch: async () => new Response("assets") },
+      } as unknown as Env,
+    );
+    expect(res.status).not.toBe(401);
+    expect(await res.text()).toBe("routed");
+  });
+
+  it("/api/slack/* is never gated by Access even without a header", async () => {
+    vi.mocked(proxyToSandbox).mockResolvedValue(null);
+    const worker = (await import("../src/index.js")).default;
+    // No SLACK_SIGNING_SECRET → 503 proves the request reached the Slack
+    // handler instead of being rejected 401 by the Access gate.
+    const res = await worker.fetch(
+      new Request("https://example.com/api/slack/command", { method: "POST" }),
+      makeAccessEnv(),
+    );
+    expect(res.status).not.toBe(401);
+    expect(res.status).toBe(503);
+  });
+
+  it("/api/github/webhook is never gated by Access even without a header", async () => {
+    vi.mocked(proxyToSandbox).mockResolvedValue(null);
+    const worker = (await import("../src/index.js")).default;
+    // No GITHUB_WEBHOOK_SECRET → 503 proves the request reached the webhook
+    // handler instead of being rejected 401 by the Access gate.
+    const res = await worker.fetch(
+      new Request("https://example.com/api/github/webhook", { method: "POST" }),
+      makeAccessEnv(),
+    );
+    expect(res.status).not.toBe(401);
+    expect(res.status).toBe(503);
+  });
+
+  it("gates routeAgentRequest without an Access header", async () => {
+    const routing = await import("agents/routing");
+    vi.mocked(proxyToSandbox).mockResolvedValue(null);
+    vi.mocked(routing.routeAgentRequest).mockResolvedValue(new Response("agent"));
+    const worker = (await import("../src/index.js")).default;
+    const denied = await worker.fetch(new Request("https://example.com/agents/chat"), makeAccessEnv());
+    expect(denied.status).toBe(401);
+    const allowed = await worker.fetch(
+      new Request("https://example.com/agents/chat", {
+        headers: { "CF-Access-Authenticated-User-Email": "alice@example.com" },
+      }),
+      makeAccessEnv(),
+    );
+    expect(await allowed.text()).toBe("agent");
+    vi.mocked(routing.routeAgentRequest).mockResolvedValue(null);
+  });
+
+  it("gates asset fetch without an Access header", async () => {
+    const routing = await import("agents/routing");
+    vi.mocked(proxyToSandbox).mockResolvedValue(null);
+    vi.mocked(routing.routeAgentRequest).mockResolvedValue(null);
+    const worker = (await import("../src/index.js")).default;
+    const denied = await worker.fetch(new Request("https://example.com/"), makeAccessEnv());
+    expect(denied.status).toBe(401);
+    const allowed = await worker.fetch(
+      new Request("https://example.com/", {
+        headers: { "CF-Access-Authenticated-User-Email": "alice@example.com" },
+      }),
+      makeAccessEnv(),
+    );
+    expect(await allowed.text()).toBe("assets");
   });
 });
