@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src dashboard test",
     "test": "vitest run",
-    "build": "npm run build:dashboard && npm run docs:build && node scripts/copy-docs.mjs && npm run docs:verify",
+    "build": "pnpm run build:dashboard && pnpm run docs:build && node scripts/copy-docs.mjs && pnpm run docs:verify",
     "docs:dev": "cd web && astro dev --port 4321",
     "docs:build": "astro build --root web",
     "docs:check": "astro check --root web",
@@ -53,6 +53,16 @@
   "license": "MIT",
   "engines": {
     "node": ">=22.12.0",
-    "npm": ">=9.6.5"
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.34.4",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@mongodb-js/zstd",
+      "core-js-pure",
+      "esbuild",
+      "node-liblzma",
+      "workerd"
+    ]
   }
 }

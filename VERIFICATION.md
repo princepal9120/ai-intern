@@ -6,10 +6,10 @@
 
 | Check | Result |
 |-------|--------|
-| `npm run typecheck` | PASS |
-| `npm run lint` | PASS |
-| `npm test` | PASS (269/269 across 21 files) |
-| `npm run build` | PASS |
+| `pnpm typecheck` | PASS |
+| `pnpm lint` | PASS |
+| `pnpm test` | PASS (270/270 across 21 files) |
+| `pnpm build` | PASS |
 | `npx wrangler deploy --dry-run` | **FAIL: Docker CLI not available on this machine** |
 | Live cloud run (PLAN.md T10) | **NOT ATTEMPTED** |
 
@@ -43,3 +43,4 @@ Specifically unmeasured: peak container memory (which decides `basic` vs `standa
 - Typecheck errors (5): dashboard import path, missing runtime test imports, unused label.
 - Test failures (7): `streamProgress` propagating `OpenCodeErrorEvent` instead of swallowing it; `runCodingTask` returning error details; `collectChanges` skipping deleted files; `redactSecrets` covering `AI_GATEWAY_TOKEN=`; progress cap counting only streamed events.
 - Lint errors (2): unused `signal` param, unused label.
+

@@ -7,13 +7,13 @@ Location: /Users/princepal/oss/ai-intern
 Full plan: /Users/princepal/oss/ai-intern/PLAN.md
 
 ## Bootstrap
-- Node.js 22.12.0+, npm 9.6.5+
+- Node.js 22.12.0+, pnpm 10.0.0+
 - Docker CLI required for Wrangler container image packaging
 - Git repo at /Users/princepal/oss/ai-intern
 - Test: `npx vitest run` (from project root)
-- Typecheck: `npm run typecheck`
-- Lint: `npm run lint`
-- Build: `npm run build`
+- Typecheck: `pnpm typecheck`
+- Lint: `pnpm lint`
+- Build: `pnpm build`
 - Deploy dry-run: `npx wrangler deploy --dry-run`
 
 ## Hard Rules
@@ -93,3 +93,4 @@ Full plan: /Users/princepal/oss/ai-intern/PLAN.md
 - Agent 1 MUST complete before Agents 3-10
 - Agent 2 can run in parallel with Agent 1
 - Agents 3-10 can all run in parallel after Agent 1 completes
+

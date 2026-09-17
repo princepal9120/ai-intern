@@ -2,7 +2,7 @@
 
 An account-owned Cloudflare coding workspace: describe a GitHub task, review the proposed delegation, approve or reject it, and inspect a sandbox-generated diff. The runtime is Cloudflare Agents + Sandbox containers running OpenCode, with a React dashboard and Astro/Starlight documentation served by one Worker.
 
-**Status: local prototype, not production-ready.** No live end-to-end cloud run is claimed. `VERIFICATION.md` records the current evidence: `npm run typecheck`, `npm run lint`, `npm test` (267/267), and `npm run build` pass locally; `npx wrangler deploy --dry-run` fails on this machine because no Docker CLI is available to package the container image. Until a dated live run is recorded in `VERIFICATION.md` against the P2 acceptance bar in `PLAN.md` §15 (submit → approve → clone/code/collect with a diff that matches reality, rejection starting no container, honest failure exit codes, PR with deletions shown as deleted, peak memory measured), the honest status stays "local prototype".
+**Status: local prototype, not production-ready.** No live end-to-end cloud run is claimed. `VERIFICATION.md` records the current evidence: `pnpm typecheck`, `pnpm lint`, `pnpm test` (270/270), and `pnpm build` pass locally; `npx wrangler deploy --dry-run` fails on this machine because no Docker CLI is available to package the container image. Until a dated live run is recorded in `VERIFICATION.md` against the P2 acceptance bar in `PLAN.md` §15 (submit → approve → clone/code/collect with a diff that matches reality, rejection starting no container, honest failure exit codes, PR with deletions shown as deleted, peak memory measured), the honest status stays "local prototype".
 
 Provider traffic is intercepted at the Sandbox egress boundary and forwarded through the account owner's AI Gateway binding — there is no provider callback route (the dead callback path was deleted; the forwarder and its route no longer exist).
 
@@ -27,35 +27,35 @@ npx wrangler login
 # Optional account mutations:
 npx wrangler secret put GITHUB_TOKEN
 npx wrangler secret put GITHUB_WEBHOOK_SECRET
-npm run build
-npm run deploy
+pnpm build
+pnpm deploy
 ~~~
 
-These commands change the operator's account. They were not executed as part of this documentation work. npm run deploy invokes Wrangler; it does not automatically build the static assets first.
+These commands change the operator's account. They were not executed as part of this documentation work. pnpm deploy invokes Wrangler; it does not automatically build the static assets first.
 
 Protect every reachable hostname with Cloudflare Access or equivalent authentication. An obscure URL is not access control. Browser approval is not route authorization. Review the security docs before live operation.
 
 ## Local quickstart
 
-Requirements: Node.js **22.12.0+**, npm **9.6.5+**. A Docker CLI is also
+Requirements: Node.js **22.12.0+**, pnpm **10.0.0+**. A Docker CLI is also
 required for Wrangler container image packaging; a missing Docker daemon
 fails even the local dry run.
 
 ~~~sh
-npm ci
-npm run typecheck
-npm run lint
-npm test
-npm run docs:check
-npm run build
-npm run docs:preview
+pnpm install
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm docs:check
+pnpm build
+pnpm docs:preview
 ~~~
 
 Open **http://localhost:4321/docs/** to read the built documentation with search.
 
-- Dashboard only: npm run dev (port 5173; no Worker API proxy).
-- Docs editing: npm run docs:dev (port 4321/docs/; search requires a production build).
-- Built Worker/assets: npm run build, then npx wrangler dev. Containers require a compatible local engine; startup may fail without it.
+- Dashboard only: pnpm dev (port 5173; no Worker API proxy).
+- Docs editing: pnpm docs:dev (port 4321/docs/; search requires a production build).
+- Built Worker/assets: pnpm build, then npx wrangler dev. Containers require a compatible local engine; startup may fail without it.
 - Local deployment packaging: npx wrangler deploy --dry-run. This is not a deployment or proof of a live coding run.
 
 ## Documentation
@@ -179,3 +179,4 @@ Cost surfaces include Workers, Workers AI planning inference, Durable Objects, C
 ## License
 
 MIT. See LICENSE.
+
