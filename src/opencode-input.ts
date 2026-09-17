@@ -16,6 +16,9 @@ const codingTaskInputSchema = z.object({
   publishPullRequest: z.boolean(),
   sandboxId: z.string().min(1),
   codingModel: z.string().min(1),
+  /** Skip git clone: workspace already restored from an R2 snapshot. */
+  skipClone: z.boolean().optional(),
+  snapshotKey: z.string().min(1).optional(),
 });
 
 export type CodingTaskInput = z.infer<typeof codingTaskInputSchema>;

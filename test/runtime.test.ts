@@ -40,6 +40,7 @@ import {
   resolveRuntimeName,
   type ProgressEvent,
   type SandboxOps,
+  unescapePorcelainPath,
 } from "../src/runtime.js";
 
 const INPUT: CodingTaskInput = {
@@ -222,8 +223,8 @@ describe("parsePorcelainStatus", () => {
     ]);
   });
 
-  it("drops unsafe paths", () => {
-    expect(parsePorcelainStatus(" M ../escape\n M /absolute\n")).toEqual([]);
+  it("drops unsafe paths but keeps legal names containing dots", () => {
+    expect(parsePorcelainStatus(" M ../escape\n M /absolute\n M notes..txt\n")).toEqual(["notes..txt"]);
   });
 });
 
@@ -652,6 +653,18 @@ describe("worker authentication gate (T7)", () => {
     expect(res.status).toBe(503);
   });
 
+  it("POST /api/slack/interact reaches its handler without an Access header", async () => {
+    vi.mocked(proxyToSandbox).mockResolvedValue(null);
+    const worker = (await import("../src/index.js")).default;
+    // No SLACK_SIGNING_SECRET -> 503 proves the mounted interact handler ran;
+    // a 404 would mean the route never reaches it, 401 that the gate did.
+    const res = await worker.fetch(
+      new Request("https://example.com/api/slack/interact", { method: "POST" }),
+      makeAccessEnv(),
+    );
+    expect(res.status).toBe(503);
+  });
+
   it("/api/github/webhook is never gated by Access even without a header", async () => {
     vi.mocked(proxyToSandbox).mockResolvedValue(null);
     const worker = (await import("../src/index.js")).default;
@@ -672,8 +685,9 @@ describe("worker authentication gate (T7)", () => {
     const worker = (await import("../src/index.js")).default;
     const denied = await worker.fetch(new Request("https://example.com/agents/chat"), makeAccessEnv());
     expect(denied.status).toBe(401);
+    // Only /agents/coding-orchestrator/<authenticated identity> reaches the DO.
     const allowed = await worker.fetch(
-      new Request("https://example.com/agents/chat", {
+      new Request("https://example.com/agents/coding-orchestrator/alice%40example.com", {
         headers: { "CF-Access-Authenticated-User-Email": "alice@example.com" },
       }),
       makeAccessEnv(),
@@ -696,5 +710,15 @@ describe("worker authentication gate (T7)", () => {
       makeAccessEnv(),
     );
     expect(await allowed.text()).toBe("assets");
+  });
+});
+
+describe("unescapePorcelainPath", () => {
+  it("decodes consecutive octal bytes as UTF-8, not Latin-1", () => {
+    expect(unescapePorcelainPath('"caf\\303\\251.txt"')).toBe("caf\u00e9.txt");
+    // Build the Japanese case from raw bytes: "\346" in a JS literal is
+    // Latin-1, not the octal escape git actually quotes.
+    const bytes = [..."\u65e5\u672c\u8a9e.md"].flatMap((c) => [...new TextEncoder().encode(c)]).map((b) => `\\${b.toString(8).padStart(3, "0")}`);
+    expect(unescapePorcelainPath(`"${bytes.join("")}"`)).toBe("\u65e5\u672c\u8a9e.md");
   });
 });

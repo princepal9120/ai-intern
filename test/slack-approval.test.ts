@@ -241,6 +241,52 @@ describe("handleSlackInteract", () => {
     );
   });
 
+  it("orchestratorStub dispatch posts the approval pointer to the DO route", async () => {
+    const fetchMock = vi.fn(
+      async (_req: Request) => new Response(JSON.stringify({ result: "approved" }), { status: 200 }),
+    );
+    const request = await signedInteractRequest({
+      userId: "U1",
+      actionId: "approve",
+      threadKey: THREAD,
+      approvalId: "appr_1",
+    });
+    const response = await handleSlackInteract(request, routeEnv("U1"), {
+      orchestratorStub: { fetch: fetchMock },
+    });
+    expect(response?.status).toBe(200);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    const forwarded = fetchMock.mock.calls[0]![0] as unknown as Request;
+    const payload = (await forwarded.json()) as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      threadKey: THREAD,
+      approvalId: "appr_1",
+      approved: true,
+      decidedBy: "U1",
+    });
+    expect(forwarded.url).toBe("https://internal/api/approvals");
+  });
+
+  it("orchestratorStub dispatch failure surfaces an ephemeral error, acks 200", async () => {
+    const respond = vi.fn(async (_url: string, text: string): Promise<void> => {
+      void text;
+    });
+    const fetchMock = vi.fn(async (_req: Request) => new Response(null, { status: 500 }));
+    const request = await signedInteractRequest({
+      userId: "U1",
+      actionId: "approve",
+      threadKey: THREAD,
+      approvalId: "appr_1",
+    });
+    const response = await handleSlackInteract(request, routeEnv("U1"), {
+      orchestratorStub: { fetch: fetchMock },
+      respond,
+    });
+    expect(response?.status).toBe(200);
+    await vi.waitFor(() => expect(respond).toHaveBeenCalledOnce());
+    expect(respond.mock.calls[0]![1]).toContain("could not be recorded");
+  });
+
   it("ignores non-interact paths", async () => {
     const request = new Request("https://example.com/api/runs", { method: "GET" });
     const response = await handleSlackInteract(request, routeEnv("U1"), testDeps());

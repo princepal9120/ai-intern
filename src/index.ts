@@ -11,8 +11,9 @@ import { assertLiveCodingModel } from "./coding-model.js";
 import type { Env } from "./env.js";
 import { Sandbox } from "./sandbox.js";
 import { redactSecrets, verifyGitHubWebhookSignature } from "./security.js";
+import { handleSlackInteract } from "./slack-approval.js";
 import { handleSlackEvents } from "./slack-events.js";
-import { handleSlackCommand } from "./slack-routes.js";
+import { ORCHESTRATOR_NAME, handleSlackCommand } from "./slack-routes.js";
 
 export { CodingOrchestrator, OpenCodeAgent, Sandbox, ContainerProxy };
 export { assertLiveCodingModel } from "./coding-model.js";
@@ -22,31 +23,33 @@ export function getUserId(request: Request): string | null {
   if (!email || email.trim() === "") {
     return null;
   }
-  return email;
+  return email.trim();
 }
 
-// Signature-authenticated paths must not sit behind Access; Slack and GitHub
-// cannot complete an Access login. Exact paths only — a prefix would exempt
-// anything added beneath it later. Write the exemption with T7, not T12.
-export const SIGNATURE_AUTHENTICATED = ["/api/slack/events", "/api/slack/command", "/api/github/webhook"];
+// Only these exact callbacks use signatures instead of an Access identity.
+export const SIGNATURE_AUTHENTICATED = ["/api/slack/events", "/api/slack/command", "/api/slack/interact", "/api/github/webhook"];
+
+
 
 export function isAuthenticated(request: Request, env: Env): boolean {
   const { pathname } = new URL(request.url);
   if (SIGNATURE_AUTHENTICATED.includes(pathname)) return true;
   if (!env.REQUIRE_ACCESS) return true; // opt-out for `wrangler dev`
-  return request.headers.has("cf-access-authenticated-user-email");
+  return getUserId(request) !== null;
 }
 
 async function handleRuns(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
-  if (!url.pathname.startsWith("/api/runs")) {
+  if (!/^\/api\/runs(?:\/[^/]+)?$/.test(url.pathname)) {
     return null;
   }
   if (!isAuthenticated(request, env)) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
-  // With REQUIRE_ACCESS set, isAuthenticated already guarantees the header.
-  // Without it (wrangler dev), fall back to the shared "default" orchestrator.
+  if (request.method !== "GET" && request.method !== "DELETE") {
+    return Response.json({ error: "Method not allowed." }, { status: 405 });
+  }
+  // Local development shares the same fallback as the dashboard identity endpoint.
   const userId = getUserId(request) ?? "default";
   const stub = await getAgentByName(env.CodingOrchestrator, userId);
   const rewritten = new Request(new URL(url.pathname + url.search, request.url), request);
@@ -89,8 +92,26 @@ async function handleGitHubWebhook(request: Request, env: Env): Promise<Response
 
 export default {
   async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
-    assertLiveCodingModel(env);
     try {
+      const url = new URL(request.url);
+      if (!isAuthenticated(request, env)) {
+        return Response.json({ error: "Authentication required." }, { status: 401 });
+      }
+      if (SIGNATURE_AUTHENTICATED.includes(url.pathname) && request.method !== "POST") {
+        return Response.json({ error: "Method not allowed." }, { status: 405 });
+      }
+      if (url.pathname === "/api/whoami") {
+        if (request.method !== "GET") {
+          return Response.json({ error: "Method not allowed." }, { status: 405 });
+        }
+        return Response.json({ agent: getUserId(request) ?? "default" }, {
+          headers: { "Cache-Control": "no-store" },
+        });
+      }
+      if (url.pathname === "/api/approvals" || url.pathname.startsWith("/internal/")) {
+        return Response.json({ error: "Not found." }, { status: 404 });
+      }
+      assertLiveCodingModel(env);
       // proxyToSandbox only needs the Sandbox binding; adapt the type.
       const sandboxEnv = {
         Sandbox: env.Sandbox as unknown as DurableObjectNamespace<SandboxBinding>,
@@ -111,21 +132,36 @@ export default {
       if (slackResponse) {
         return slackResponse;
       }
+      // Durable persistence is live (queue writes the approval record before
+      // acking; the DO re-validates pending+TTL on resolve), so clicks dispatch
+      // to the shared orchestrator instead of failing closed.
+      const slackInteractResponse = await handleSlackInteract(request, env, {
+        orchestratorStub: await getAgentByName(env.CodingOrchestrator, ORCHESTRATOR_NAME),
+      }, ctx ? { waitUntil: (promise) => ctx.waitUntil(promise) } : undefined);
+      if (slackInteractResponse) {
+        return slackInteractResponse;
+      }
       const webhookResponse = await handleGitHubWebhook(request, env);
       if (webhookResponse) {
         return webhookResponse;
       }
-      // Layer 2 — fail closed in the Worker. Access gate for the agent
-      // WebSocket/HTTP routes and the dashboard assets. Signature-
-      // authenticated Slack/GitHub routes already returned above.
-      // NOTE: header check is not JWT verification; the route must stay
-      // behind Access. JWT verification is filed as v0.2.
-      if (!isAuthenticated(request, env)) {
-        return Response.json({ error: "Authentication required." }, { status: 401 });
+      if (url.pathname.startsWith("/agents/")) {
+        const route = url.pathname.match(/^\/agents\/coding-orchestrator\/([^/]+)(?:\/(.*))?$/);
+        if (!route) return Response.json({ error: "Not found." }, { status: 404 });
+        let name: string;
+        try {
+          name = decodeURIComponent(route[1]!);
+        } catch {
+          return Response.json({ error: "Invalid agent name." }, { status: 400 });
+        }
+        if (name !== (getUserId(request) ?? "default")) {
+          return Response.json({ error: "Forbidden." }, { status: 403 });
+        }
+        // Slack queue and approval routes are reachable only through verified callbacks.
+        if (route[2]?.startsWith("api/") || route[2]?.startsWith("internal/")) {
+          return Response.json({ error: "Not found." }, { status: 404 });
+        }
       }
-      // Only the orchestrator is reachable over /agents/*. Exposing the
-      // OpenCodeAgent and Sandbox bindings would let a client start a coding
-      // or sandbox run without passing the approval gate.
       const agentResponse = await routeAgentRequest(request, {
         CodingOrchestrator: env.CodingOrchestrator,
       });

@@ -1,5 +1,5 @@
 /**
- * Complete End-to-End AI Intern Dashboard.
+ * Complete End-to-End Shiba Dashboard.
  * Approval-gated coding tasks delegated to isolated Cloudflare Sandbox containers running OpenCode.
  */
 import {
@@ -20,7 +20,6 @@ import {
 } from "./ui-helpers";
 
 const ORCHESTRATOR_AGENT = "coding-orchestrator";
-const ORCHESTRATOR_NAME = "default";
 
 interface RetainedRun {
   runId: string;
@@ -162,7 +161,39 @@ export function App(): React.JSX.Element {
   const [decisions, setDecisions] = useState<Record<string, boolean>>({});
   const [approvalAnnouncement, setApprovalAnnouncement] = useState("");
 
-  const agent = useAgent({ agent: ORCHESTRATOR_AGENT, name: ORCHESTRATOR_NAME });
+  // /api/runs routes by Access identity; the chat socket must use the same
+  // DO name or the dashboard would read one identity's runs and chat to another.
+  const [orchestratorName, setOrchestratorName] = useState<string | null>(null);
+  const [identityError, setIdentityError] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/whoami")
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`GET /api/whoami failed with ${res.status}`);
+        return (await res.json()) as { agent?: string };
+      })
+      .then((body) => {
+        if (!cancelled && typeof body.agent === "string" && body.agent !== "") {
+          setOrchestratorName(body.agent);
+        } else {
+          setIdentityError("The server did not return an agent identity.");
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setIdentityError(error instanceof Error ? error.message : "Identity lookup failed.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const agent = useAgent({
+    agent: ORCHESTRATOR_AGENT,
+    // Undefined until identity resolves; never fall back to a shared name.
+    name: orchestratorName ?? undefined,
+  });
   const chat = useAgentChat({
     agent,
     onError: () => {
@@ -342,7 +373,9 @@ export function App(): React.JSX.Element {
       retainedRuns.filter((r) => r.status === "running" || r.status === "pending").length;
   }, [toolRuns, retainedRuns]);
 
-  const connectionState = agent.connectionError
+  const connectionState = identityError
+    ? `Identity error: ${identityError}`
+    : agent.connectionError
     ? `Connection error: ${agent.connectionError.message ?? "unknown"}`
     : agent.identified
       ? "Connected"
@@ -360,15 +393,15 @@ export function App(): React.JSX.Element {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f1419] text-[#e6edf3] font-sans selection:bg-[#4f9cf0] selection:text-[#06121f] flex flex-col">
+    <div className="min-h-screen bg-black text-[#e6edf3] font-sans selection:bg-[#63c8c1] selection:text-black flex flex-col">
       {/* TOP HEADER BAR */}
-      <header className="h-14 border-b border-[#2a3441] bg-[#182028] px-4 lg:px-6 flex items-center justify-between z-20 shrink-0 shadow-sm">
+      <header className="h-14 border-b border-neutral-800 bg-[#090b0e] px-4 lg:px-6 flex items-center justify-between z-20 shrink-0 shadow-sm">
         <div className="flex items-center gap-3">
           <a href="/" className="flex items-center gap-2.5 text-white hover:opacity-90 transition-opacity">
-            <img src="/assets/mascot/shiba-avatar.png" alt="Shiba Mascot" className="w-8 h-8 rounded-lg shadow-[0_0_12px_rgba(11,159,149,0.4)] object-cover border border-teal-500/50" />
+            <img src="/assets/mascot/shiba-logo-animated.svg" alt="Shiba Mascot" className="w-8 h-8 rounded-lg shadow-[0_0_12px_rgba(11,159,149,0.4)] object-cover border border-teal-500/50" />
             <div>
               <div className="font-bold tracking-tight text-sm text-white flex items-center gap-1.5">
-                AI Software Engineer
+                Shiba
                 <span className="text-[10px] font-mono text-teal-400 bg-teal-950/60 border border-teal-800/60 px-1.5 py-0.2 rounded">
                   Cloudflare Native
                 </span>
@@ -379,14 +412,14 @@ export function App(): React.JSX.Element {
 
         <div className="flex items-center gap-3 sm:gap-4">
           {/* Active Sandboxes Pill */}
-          <div className="hidden sm:inline-flex items-center gap-1.5 border border-[#2a3441] bg-[#0f1419] rounded-full px-2.5 py-1 text-xs font-mono text-[#8b98a9]">
+          <div className="hidden sm:inline-flex items-center gap-1.5 border border-neutral-800 bg-black rounded-full px-2.5 py-1 text-xs font-mono text-[#8b98a9]">
             <span className={`w-1.5 h-1.5 rounded-full ${activeSandboxCount > 0 ? "bg-[#4f9cf0] animate-pulse" : "bg-zinc-600"}`} />
             <span>{activeSandboxCount} / 5 sandboxes active</span>
           </div>
 
           {/* Connection Status */}
           <div
-            className="inline-flex items-center gap-2 border border-[#2a3441] bg-[#0f1419] rounded-full px-3 py-1 text-xs font-medium text-[#8b98a9]"
+            className="inline-flex items-center gap-2 border border-neutral-800 bg-black rounded-full px-3 py-1 text-xs font-medium text-[#8b98a9]"
             role="status"
             aria-live="polite"
           >
@@ -407,7 +440,7 @@ export function App(): React.JSX.Element {
           <button
             type="button"
             onClick={() => setShowShortcutsModal(true)}
-            className="w-8 h-8 rounded-lg border border-[#2a3441] bg-[#0f1419] hover:bg-[#2a3441] text-[#8b98a9] hover:text-white flex items-center justify-center text-xs font-mono transition-colors"
+            className="w-8 h-8 rounded-lg border border-neutral-800 bg-black hover:bg-[#2a3441] text-[#8b98a9] hover:text-white flex items-center justify-center text-xs font-mono transition-colors"
             title="Keyboard shortcuts (?)"
             aria-label="Keyboard shortcuts"
           >
@@ -417,7 +450,7 @@ export function App(): React.JSX.Element {
           {/* Links */}
           <a
             href="/docs/"
-            className="text-xs text-[#4f9cf0] hover:text-[#3b82f6] font-medium transition-colors border border-[#2a3441] px-2.5 py-1 rounded-md bg-[#0f1419]"
+            className="text-xs text-[#4f9cf0] hover:text-[#3b82f6] font-medium transition-colors border border-neutral-800 px-2.5 py-1 rounded-md bg-black"
           >
             Docs
           </a>
@@ -426,17 +459,17 @@ export function App(): React.JSX.Element {
 
       <div className="flex-1 flex flex-col xl:flex-row overflow-hidden">
         {/* SIDEBAR: Config & Task Form */}
-        <aside className="w-full xl:w-96 border-r-0 xl:border-r border-[#2a3441] bg-[#182028] flex flex-col shrink-0 h-auto xl:h-[calc(100vh-3.5rem)] overflow-y-auto">
-          <div className="p-5 xl:p-6 border-b border-[#2a3441]">
+        <aside className="w-full xl:w-96 border-r-0 xl:border-r border-neutral-800 bg-[#090b0e] flex flex-col shrink-0 h-auto xl:h-[calc(100vh-3.5rem)] overflow-y-auto">
+          <div className="p-5 xl:p-6 border-b border-neutral-800">
             <div className="flex items-center justify-between mb-2">
               <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                <img src="/assets/mascot/shiba-avatar.png" alt="Mascot" className="w-6 h-6 rounded-md object-cover border border-teal-500/40" />
+                <img src="/assets/mascot/shiba-logo-animated.svg" alt="Mascot" className="w-6 h-6 rounded-md object-cover border border-teal-500/40" />
                 New Coding Task
               </h1>
               <span className="text-[11px] font-mono text-[#8b98a9]">v0.1.0</span>
             </div>
             <p className="text-xs text-[#8b98a9] leading-relaxed mb-3">
-              Self-hosted on your Cloudflare account. AI Software Engineer plans tasks, delegates to isolated Sandbox micro-containers, and awaits your approval.
+              Self-hosted on your Cloudflare account. Shiba plans tasks, delegates to isolated Sandbox micro-containers, and awaits your approval.
             </p>
 
             {/* Quick Starter Templates */}
@@ -453,7 +486,7 @@ export function App(): React.JSX.Element {
                       setTask(tmpl.task);
                       if (!repoUrl) setRepoUrl("https://github.com/cloudflare/ai-chat");
                     }}
-                    className="text-left text-[11px] px-2 py-1.5 rounded bg-[#0f1419] hover:bg-[#2a3441] text-[#e6edf3] border border-[#2a3441] transition-colors truncate"
+                    className="text-left text-[11px] px-2 py-1.5 rounded bg-black hover:bg-[#2a3441] text-[#e6edf3] border border-neutral-800 transition-colors truncate"
                   >
                     {tmpl.label}
                   </button>
@@ -482,11 +515,11 @@ export function App(): React.JSX.Element {
             />
 
             <div className="text-[11px] text-[#8b98a9] text-center pt-1 font-mono">
-              Tip: Press <kbd className="bg-[#0f1419] px-1 py-0.5 rounded border border-[#2a3441]">⌘</kbd> + <kbd className="bg-[#0f1419] px-1 py-0.5 rounded border border-[#2a3441]">Enter</kbd> to submit
+              Tip: Press <kbd className="bg-black px-1 py-0.5 rounded border border-neutral-800">⌘</kbd> + <kbd className="bg-black px-1 py-0.5 rounded border border-neutral-800">Enter</kbd> to submit
             </div>
 
             {notice ? (
-              <div className="text-xs text-[#8b98a9] bg-[#0f1419] p-3 rounded-lg border border-[#2a3441] flex items-start gap-2">
+              <div className="text-xs text-[#8b98a9] bg-black p-3 rounded-lg border border-neutral-800 flex items-start gap-2">
                 <svg className="w-4 h-4 text-[#4f9cf0] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -513,7 +546,7 @@ export function App(): React.JSX.Element {
             ) : null}
 
             {/* Architecture Info Pill */}
-            <div className="mt-auto pt-4 border-t border-[#2a3441] flex flex-col gap-1.5 text-[11px] text-[#8b98a9] font-mono">
+            <div className="mt-auto pt-4 border-t border-neutral-800 flex flex-col gap-1.5 text-[11px] text-[#8b98a9] font-mono">
               <div className="flex items-center justify-between">
                 <span>Orchestrator:</span>
                 <span className="text-[#e6edf3]">Think (Llama 3.1)</span>
@@ -531,10 +564,10 @@ export function App(): React.JSX.Element {
         </aside>
 
         {/* MAIN CONTENT: Conversation & Runs */}
-        <main className="flex-1 flex flex-col h-auto xl:h-[calc(100vh-3.5rem)] overflow-hidden bg-[#0f1419]">
+        <main className="flex-1 flex flex-col h-auto xl:h-[calc(100vh-3.5rem)] overflow-hidden bg-black">
           {/* TOP: PENDING APPROVALS ALERT */}
           {(pendingApprovals.length > 0 || approvalAnnouncement) ? (
-            <div className="bg-[#182028] border-b border-[#2a3441] px-6 xl:px-8 py-3.5 flex items-center justify-between shadow-sm z-10 shrink-0">
+            <div className="bg-[#090b0e] border-b border-neutral-800 px-6 xl:px-8 py-3.5 flex items-center justify-between shadow-sm z-10 shrink-0">
               <p className="text-sm font-medium text-[#e6edf3]" role="status" aria-live="polite">
                 {pendingApprovals.length > 0 ? (
                   <span className="flex items-center gap-2 text-[#c9a227]">
@@ -556,11 +589,11 @@ export function App(): React.JSX.Element {
           <div className="flex-1 overflow-y-auto p-5 xl:p-8 flex flex-col xl:flex-row gap-6 xl:gap-8">
             {/* CONVERSATION AREA */}
             <section className="flex-1 min-w-0 flex flex-col gap-5" aria-label="Conversation">
-              <div className="flex items-center justify-between border-b border-[#2a3441] pb-3">
+              <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
                 <div className="flex items-center gap-2.5">
                   <h2 className="text-base font-semibold text-white">Conversation</h2>
                   {chat.messages.length > 0 ? (
-                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#182028] border border-[#2a3441] text-[#8b98a9]">
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#090b0e] border border-neutral-800 text-[#8b98a9]">
                       {chat.messages.length} message{chat.messages.length === 1 ? "" : "s"}
                     </span>
                   ) : null}
@@ -568,11 +601,11 @@ export function App(): React.JSX.Element {
               </div>
 
               {chat.messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 border border-dashed border-[#2a3441] rounded-xl bg-[#182028]/40 px-6 text-center">
-                  <img src="/assets/mascot/shiba-puppy.png" alt="Shiba puppy mascot" className="w-48 h-auto max-h-36 rounded-xl shadow-lg border border-teal-500/30 mb-3 object-cover transition-transform hover:scale-105" />
+                <div className="flex flex-col items-center justify-center py-16 border border-dashed border-neutral-800 rounded-xl bg-[#090b0e]/40 px-6 text-center">
+                  <img src="/assets/mascot/shiba-sticker-hero.webp" alt="Shiba illustration mascot" className="w-56 h-auto max-h-40 rounded-xl shadow-lg border border-teal-500/30 mb-3 object-cover transition-transform hover:scale-105" />
                   <p className="text-[#8b98a9] text-sm mb-2 font-medium">No messages yet. Submit a task to start.</p>
                   <p className="text-xs text-[#8b98a9]/70 max-w-sm">
-                    AI Software Engineer is ready. Enter a repository and describe the changes you want.
+                    Shiba is ready. Enter a repository and describe the changes you want.
                   </p>
                 </div>
               ) : (
@@ -587,8 +620,8 @@ export function App(): React.JSX.Element {
                           </>
                         ) : (
                           <div className="flex items-center gap-1.5">
-                            <img src="/assets/mascot/shiba-avatar.png" alt="Shiba" className="w-4 h-4 rounded-full object-cover border border-teal-500/40 shadow-sm" />
-                            <span className="text-teal-400 font-bold">AI Software Engineer</span>
+                            <img src="/assets/mascot/shiba-logo-animated.svg" alt="Shiba" className="w-4 h-4 rounded-full object-cover border border-teal-500/40 shadow-sm" />
+                            <span className="text-teal-400 font-bold">Shiba</span>
                           </div>
                         )}
                       </div>
@@ -596,7 +629,7 @@ export function App(): React.JSX.Element {
                         className={`flex flex-col gap-2 max-w-[92%] md:max-w-[85%] ${
                           message.role === "user"
                             ? "bg-[#4f9cf0] text-[#06121f] rounded-2xl rounded-tr-sm p-4 font-medium shadow-sm"
-                            : "bg-[#182028] border border-[#2a3441] text-[#e6edf3] rounded-2xl rounded-tl-sm p-4 shadow-sm"
+                            : "bg-[#090b0e] border border-neutral-800 text-[#e6edf3] rounded-2xl rounded-tl-sm p-4 shadow-sm"
                         }`}
                       >
                         {message.parts.map((part, index) => {
@@ -614,7 +647,7 @@ export function App(): React.JSX.Element {
                             return (
                               <div
                                 key={index}
-                                className="flex flex-wrap items-center gap-2 mt-2 bg-[#0f1419]/70 p-2.5 rounded-lg border border-[#2a3441]/60 font-mono text-xs"
+                                className="flex flex-wrap items-center gap-2 mt-2 bg-black/70 p-2.5 rounded-lg border border-neutral-800/60 font-mono text-xs"
                               >
                                 <span className="text-teal-400 font-semibold bg-[#2a3441]/60 px-2 py-0.5 rounded">
                                   {toolDisplayName(part)}
@@ -625,7 +658,7 @@ export function App(): React.JSX.Element {
                                       ? "text-[#f06666] border-[#f06666]/30 bg-[#f06666]/10"
                                       : state === "waiting-approval"
                                       ? "text-[#c9a227] border-[#c9a227]/30 bg-[#c9a227]/10 animate-pulse"
-                                      : "text-[#8b98a9] border-[#2a3441] bg-[#182028]"
+                                      : "text-[#8b98a9] border-neutral-800 bg-[#090b0e]"
                                   }`}
                                 >
                                   {approval?.approved === false ? "Rejected" : state}
@@ -643,10 +676,10 @@ export function App(): React.JSX.Element {
                   {(chat.isStreaming || chat.status === "streaming") ? (
                     <li className="flex flex-col items-start">
                       <div className="flex items-center gap-2 text-xs font-semibold text-teal-400 mb-1 px-1">
-                        <img src="/assets/mascot/shiba-avatar.png" alt="Shiba" className="w-4 h-4 rounded-full object-cover border border-teal-500/40 shadow-sm animate-bounce" />
-                        AI Software Engineer is reasoning...
+                        <img src="/assets/mascot/shiba-logo-animated.svg" alt="Shiba" className="w-4 h-4 rounded-full object-cover border border-teal-500/40 shadow-sm animate-bounce" />
+                        Shiba is reasoning...
                       </div>
-                      <div className="bg-[#182028] border border-[#2a3441] rounded-2xl rounded-tl-sm p-4 text-xs text-[#8b98a9] flex items-center gap-2">
+                      <div className="bg-[#090b0e] border border-neutral-800 rounded-2xl rounded-tl-sm p-4 text-xs text-[#8b98a9] flex items-center gap-2">
                         <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-teal-400 border-t-transparent rounded-full" />
                         <span>Planning coding execution in sandbox</span>
                       </div>
@@ -657,7 +690,7 @@ export function App(): React.JSX.Element {
 
               {/* PENDING APPROVALS CARDS */}
               {pendingApprovals.length > 0 ? (
-                <div className="mt-4 border-t border-[#2a3441] pt-5 flex flex-col gap-4" role="group" aria-label="Pending approvals">
+                <div className="mt-4 border-t border-neutral-800 pt-5 flex flex-col gap-4" role="group" aria-label="Pending approvals">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-[#c9a227] flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-[#c9a227] animate-pulse" />
@@ -669,11 +702,11 @@ export function App(): React.JSX.Element {
                   {pendingApprovals.map((approval) => (
                     <div
                       key={approval.approvalId}
-                      className="border border-[#c9a227]/60 bg-[#182028] rounded-xl p-5 shadow-lg shadow-[#c9a227]/5 flex flex-col gap-3"
+                      className="border border-[#c9a227]/60 bg-[#090b0e] rounded-xl p-5 shadow-lg shadow-[#c9a227]/5 flex flex-col gap-3"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="font-mono font-bold text-sm text-[#e6edf3] flex items-center gap-2">
-                          <img src="/assets/mascot/shiba-avatar.png" alt="Shiba Guard" className="w-5 h-5 rounded-full object-cover border border-amber-500/50" />
+                          <img src="/assets/mascot/shiba-logo-animated.svg" alt="Shiba Guard" className="w-5 h-5 rounded-full object-cover border border-amber-500/50" />
                           {approval.tool}
                         </div>
                         <span className="text-[10px] uppercase tracking-wider font-bold bg-[#c9a227]/15 border border-[#c9a227]/30 text-[#c9a227] px-2 py-0.5 rounded-full">
@@ -681,7 +714,7 @@ export function App(): React.JSX.Element {
                         </span>
                       </div>
 
-                      <pre className="whitespace-pre-wrap font-mono text-xs text-[#8b98a9] bg-[#0f1419] p-3 rounded-lg border border-[#2a3441] max-h-56 overflow-auto mb-1">
+                      <pre className="whitespace-pre-wrap font-mono text-xs text-[#8b98a9] bg-black p-3 rounded-lg border border-neutral-800 max-h-56 overflow-auto mb-1">
                         {typeof approval.input === "string" ? approval.input : JSON.stringify(approval.input, null, 2)}
                       </pre>
 
@@ -721,11 +754,11 @@ export function App(): React.JSX.Element {
 
             {/* RUNS AREA */}
             <section className="flex-1 min-w-0 flex flex-col gap-5" aria-label="Delegated runs">
-              <div className="flex items-center justify-between border-b border-[#2a3441] pb-3">
+              <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
                 <div className="flex items-center gap-3">
                   <h2 className="text-base font-semibold text-white">Delegated Runs</h2>
                   {/* Status filter tabs */}
-                  <div className="hidden sm:flex items-center gap-1 bg-[#0f1419] p-0.5 rounded-lg border border-[#2a3441] text-xs">
+                  <div className="hidden sm:flex items-center gap-1 bg-black p-0.5 rounded-lg border border-neutral-800 text-xs">
                     <button
                       type="button"
                       onClick={() => setActiveTab("all")}
@@ -758,7 +791,7 @@ export function App(): React.JSX.Element {
 
                 <button
                   type="button"
-                  className="text-xs bg-[#182028] hover:bg-[#2a3441] border border-[#2a3441] text-[#e6edf3] font-medium py-1.5 px-3 rounded-md transition-colors flex items-center gap-1.5"
+                  className="text-xs bg-[#090b0e] hover:bg-[#2a3441] border border-neutral-800 text-[#e6edf3] font-medium py-1.5 px-3 rounded-md transition-colors flex items-center gap-1.5"
                   onClick={refreshRuns}
                   title="Refresh runs"
                 >
@@ -771,7 +804,7 @@ export function App(): React.JSX.Element {
 
               {/* LIVE RUNS LIST */}
               {toolRuns.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 border border-dashed border-[#2a3441] rounded-xl bg-[#182028]/40 px-4 text-center">
+                <div className="flex flex-col items-center justify-center py-8 border border-dashed border-neutral-800 rounded-xl bg-[#090b0e]/40 px-4 text-center">
                   <p className="text-[#8b98a9] text-sm">No live runs. Approved tasks appear here while they execute.</p>
                 </div>
               ) : (
@@ -784,10 +817,10 @@ export function App(): React.JSX.Element {
                     })
                     .map((run) => {
                       const completedDiff = extractCompletedDiff(run);
-                      const sColor = statusColors[run.status] || "text-[#8b98a9] border-[#2a3441] bg-[#182028]";
+                      const sColor = statusColors[run.status] || "text-[#8b98a9] border-neutral-800 bg-[#090b0e]";
 
                       return (
-                        <li key={run.runId} className="border border-[#2a3441] rounded-xl p-4 bg-[#182028] shadow-sm">
+                        <li key={run.runId} className="border border-neutral-800 rounded-xl p-4 bg-[#090b0e] shadow-sm">
                           <div className="flex items-start justify-between gap-3 mb-2">
                             <div className="flex items-center gap-2 min-w-0">
                               <span className="w-2 h-2 rounded-full bg-teal-400" />
@@ -805,13 +838,13 @@ export function App(): React.JSX.Element {
 
                           {/* Terminal Output Parts */}
                           {run.parts.length > 0 ? (
-                            <pre className="font-mono text-xs text-[#8b98a9] bg-[#0f1419] p-3 rounded-lg border border-[#2a3441] max-h-40 overflow-auto whitespace-pre-wrap break-words mb-3">
+                            <pre className="font-mono text-xs text-[#8b98a9] bg-black p-3 rounded-lg border border-neutral-800 max-h-40 overflow-auto whitespace-pre-wrap break-words mb-3">
                               {run.parts.map(runPartText).join("\n")}
                             </pre>
                           ) : null}
 
                           {run.summary ? (
-                            <pre className="font-mono text-xs text-[#e6edf3] bg-[#0f1419] p-3 rounded-lg border border-[#2a3441] max-h-40 overflow-auto whitespace-pre-wrap break-words mb-3">
+                            <pre className="font-mono text-xs text-[#e6edf3] bg-black p-3 rounded-lg border border-neutral-800 max-h-40 overflow-auto whitespace-pre-wrap break-words mb-3">
                               {run.summary}
                             </pre>
                           ) : null}
@@ -838,7 +871,7 @@ export function App(): React.JSX.Element {
               )}
 
               {/* RETAINED RUNS SECTION */}
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#8b98a9] mt-4 border-t border-[#2a3441] pt-6 flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#8b98a9] mt-4 border-t border-neutral-800 pt-6 flex items-center justify-between">
                 <span>Retained Runs</span>
                 {retainedRuns.length > 0 ? (
                   <span className="text-[11px] font-mono lowercase">{retainedRuns.length} total</span>
@@ -856,11 +889,11 @@ export function App(): React.JSX.Element {
                       return true;
                     })
                     .map((run) => {
-                      const sColor = statusColors[run.status] || "text-[#8b98a9] border-[#2a3441] bg-[#182028]";
+                      const sColor = statusColors[run.status] || "text-[#8b98a9] border-neutral-800 bg-[#090b0e]";
                       const repoName = parseRepoName(run.repoUrl);
 
                       return (
-                        <li key={run.runId} className="border border-[#2a3441] rounded-xl bg-[#182028] overflow-hidden">
+                        <li key={run.runId} className="border border-neutral-800 rounded-xl bg-[#090b0e] overflow-hidden">
                           <details className="group">
                             <summary
                               className="flex items-center justify-between p-4 cursor-pointer hover:bg-[#2a3441]/30 transition-colors select-none"
@@ -887,7 +920,7 @@ export function App(): React.JSX.Element {
                               </span>
                             </summary>
 
-                            <div className="p-4 pt-0 border-t border-[#2a3441]/50 mt-1 flex flex-col gap-3">
+                            <div className="p-4 pt-0 border-t border-neutral-800/50 mt-1 flex flex-col gap-3">
                               <div className="text-[11px] text-[#8b98a9] font-mono flex flex-wrap gap-x-3 gap-y-1">
                                 <span>Sandbox: {run.sandboxId}</span>
                                 <span>Branch: {run.baseBranch}</span>
@@ -896,12 +929,12 @@ export function App(): React.JSX.Element {
                                 ) : null}
                               </div>
 
-                              <pre className="font-sans text-sm text-[#e6edf3] whitespace-pre-wrap break-words bg-[#0f1419]/40 p-2.5 rounded-lg border border-[#2a3441]/50">
+                              <pre className="font-sans text-sm text-[#e6edf3] whitespace-pre-wrap break-words bg-black/40 p-2.5 rounded-lg border border-neutral-800/50">
                                 {run.task}
                               </pre>
 
                               {run.summary ? (
-                                <pre className="font-mono text-xs text-[#e6edf3] bg-[#0f1419] p-3 rounded-lg border border-[#2a3441] whitespace-pre-wrap break-words max-h-40 overflow-auto">
+                                <pre className="font-mono text-xs text-[#e6edf3] bg-black p-3 rounded-lg border border-neutral-800 whitespace-pre-wrap break-words max-h-40 overflow-auto">
                                   {run.summary}
                                 </pre>
                               ) : null}
@@ -929,7 +962,7 @@ export function App(): React.JSX.Element {
 
                                 <button
                                   type="button"
-                                  className="text-xs bg-[#0f1419] hover:bg-[#2a3441] border border-[#2a3441] text-[#8b98a9] hover:text-[#e6edf3] font-medium py-1.5 px-3 rounded-md transition-colors"
+                                  className="text-xs bg-black hover:bg-[#2a3441] border border-neutral-800 text-[#8b98a9] hover:text-[#e6edf3] font-medium py-1.5 px-3 rounded-md transition-colors"
                                   onClick={() => {
                                     setRepoUrl(run.repoUrl);
                                     setBaseBranch(run.baseBranch);
@@ -955,7 +988,7 @@ export function App(): React.JSX.Element {
       {/* CLEAR HISTORY CONFIRMATION MODAL */}
       {showClearModal ? (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#182028] border border-[#2a3441] rounded-xl max-w-md w-full p-6 shadow-2xl">
+          <div className="bg-[#090b0e] border border-neutral-800 rounded-xl max-w-md w-full p-6 shadow-2xl">
             <h3 className="text-lg font-bold text-white mb-2">Clear Conversation & Runs?</h3>
             <p className="text-sm text-[#8b98a9] mb-5 leading-relaxed">
               This will erase all active conversation history and delete retained run registry records on the orchestrator. Active sandboxes will not be destroyed automatically.
@@ -963,7 +996,7 @@ export function App(): React.JSX.Element {
             <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
-                className="px-4 py-2 rounded-lg text-sm font-medium text-[#8b98a9] hover:text-white bg-[#0f1419] border border-[#2a3441] transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-medium text-[#8b98a9] hover:text-white bg-black border border-neutral-800 transition-colors"
                 onClick={() => setShowClearModal(false)}
               >
                 Cancel
@@ -983,7 +1016,7 @@ export function App(): React.JSX.Element {
       {/* KEYBOARD SHORTCUTS MODAL */}
       {showShortcutsModal ? (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#182028] border border-[#2a3441] rounded-xl max-w-md w-full p-6 shadow-2xl">
+          <div className="bg-[#090b0e] border border-neutral-800 rounded-xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold text-white">Keyboard Shortcuts</h3>
               <button
@@ -995,21 +1028,21 @@ export function App(): React.JSX.Element {
               </button>
             </div>
             <div className="flex flex-col gap-2.5 text-xs">
-              <div className="flex items-center justify-between py-1.5 border-b border-[#2a3441]">
+              <div className="flex items-center justify-between py-1.5 border-b border-neutral-800">
                 <span className="text-[#8b98a9]">Submit Task</span>
-                <span className="font-mono bg-[#0f1419] border border-[#2a3441] px-2 py-0.5 rounded text-[#e6edf3]">
+                <span className="font-mono bg-black border border-neutral-800 px-2 py-0.5 rounded text-[#e6edf3]">
                   ⌘ / Ctrl + Enter
                 </span>
               </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-[#2a3441]">
+              <div className="flex items-center justify-between py-1.5 border-b border-neutral-800">
                 <span className="text-[#8b98a9]">Close Modals</span>
-                <span className="font-mono bg-[#0f1419] border border-[#2a3441] px-2 py-0.5 rounded text-[#e6edf3]">
+                <span className="font-mono bg-black border border-neutral-800 px-2 py-0.5 rounded text-[#e6edf3]">
                   Escape
                 </span>
               </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-[#2a3441]">
+              <div className="flex items-center justify-between py-1.5 border-b border-neutral-800">
                 <span className="text-[#8b98a9]">Open Shortcuts Guide</span>
-                <span className="font-mono bg-[#0f1419] border border-[#2a3441] px-2 py-0.5 rounded text-[#e6edf3]">
+                <span className="font-mono bg-black border border-neutral-800 px-2 py-0.5 rounded text-[#e6edf3]">
                   ?
                 </span>
               </div>
@@ -1017,7 +1050,7 @@ export function App(): React.JSX.Element {
             <div className="mt-5 text-right">
               <button
                 type="button"
-                className="px-4 py-1.5 rounded-lg text-xs font-medium text-[#e6edf3] bg-[#0f1419] border border-[#2a3441] hover:bg-[#2a3441] transition-colors"
+                className="px-4 py-1.5 rounded-lg text-xs font-medium text-[#e6edf3] bg-black border border-neutral-800 hover:bg-[#2a3441] transition-colors"
                 onClick={() => setShowShortcutsModal(false)}
               >
                 Done
@@ -1029,6 +1062,8 @@ export function App(): React.JSX.Element {
     </div>
   );
 }
+
+
 
 
 

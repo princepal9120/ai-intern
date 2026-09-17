@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   MAX_CONCURRENT_RUNS,
+  RUN_DEADLINE_MS,
   canStartRun,
   countActiveRuns,
   createRun,
@@ -103,7 +104,24 @@ describe("run registry", () => {
       expect(countActiveRuns(retained)).toBe(2);
       expect(canStartRun(retained)).toBe(true);
       expect(retained).toHaveLength(3);
-      expect(finished).toEqual({ ...c, status, summary: "progress", error: "diagnostic", updatedAt: 3000 });
+      expect(finished).toEqual({
+        ...c,
+        status,
+        summary: "progress",
+        error: "diagnostic",
+        updatedAt: 3000,
+        receipts:
+          status === "cancelled"
+            ? c.receipts
+            : [
+                ...(c.receipts ?? []),
+                {
+                  at: 3000,
+                  kind: status === "completed" ? "submit" : "error",
+                  message: "diagnostic",
+                },
+              ],
+      });
       expect(c.status).toBe("running");
     },
   );
@@ -124,11 +142,11 @@ describe("run registry", () => {
   });
 
   it.each(["completed", "error"] as const)(
-    "allows a soft-terminal %s run to be superseded while carrying its record forward",
+    "keeps a terminal %s run immutable; retries require a new run ID",
     (status) => {
       const prior = transitionRun(makeRun("r1", "running"), status, { summary: "first attempt" }, 3000);
       const rerun = transitionRun(prior, "running", undefined, 4000);
-      expect(rerun).toEqual({ ...prior, status: "running", updatedAt: 4000 });
+      expect(rerun).toEqual(prior);
       expect(rerun.summary).toBe("first attempt");
       expect(rerun.error).toBeUndefined();
     },
@@ -151,3 +169,10 @@ describe("run registry", () => {
     expect(canStartRun(freed)).toBe(true);
   });
 });
+
+describe("run deadline headroom", () => {
+  it("exceeds the worst-case phase budget (clone 5m + harness 15m + git 5m)", () => {
+    expect(RUN_DEADLINE_MS).toBeGreaterThanOrEqual(45 * 60 * 1000);
+  });
+});
+

@@ -111,7 +111,7 @@ export async function publishFilesAsPullRequest(
 
   const treeEntries: Array<{ path: string; mode?: string; type?: string; sha: string | null }> = [];
   for (const file of request.files) {
-    if (!file.path || file.path.startsWith("/") || file.path.includes("..")) {
+    if (!file.path || file.path.startsWith("/") || file.path.split("/").includes("..")) {
       throw new Error(`Refusing to publish unsafe file path: ${file.path}`);
     }
     // Null content = deletion: a null-sha tree entry removes the path from the tree.

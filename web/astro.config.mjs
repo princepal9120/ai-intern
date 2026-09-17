@@ -16,10 +16,10 @@ export default defineConfig({
 			description:
 				'Open-source, self-hosted coding agent. Slack and dashboard to GitHub PR with approval gates.',
 			logo: {
-				src: './src/assets/logo.svg',
+				src: './src/assets/logo.png',
 				alt: 'AI Intern Logo',
 			},
-			favicon: '/favicon.svg',
+			favicon: '/favicon.ico',
 			customCss: ['./src/styles/theme.css'],
 			social: [
 				{ icon: 'github', label: 'GitHub', href: 'https://github.com/princepal9120/ai-intern' },

@@ -95,7 +95,7 @@ describe("slack slash command", () => {
       channel_id: "C456",
     });
     const fetchMock = vi.fn(
-      async (_req: Request) => new Response(JSON.stringify({ ok: true }), { status: 200 }),
+      async (_req: Request) => new Response(JSON.stringify({ ok: true, approvalId: "a-77" }), { status: 200 }),
     );
     const response = await handleSlackCommand(request, routeEnv(), {
       orchestratorStub: { fetch: fetchMock },
@@ -107,7 +107,11 @@ describe("slack slash command", () => {
     expect(payload.repoUrl).toBe("https://github.com/owner/repo");
     expect(payload.task).toContain("Fix the login bug");
     expect(response!.status).toBe(200);
-    await expect(response!.text()).resolves.toContain("Task queued");
+    // The queued reply carries the approval card so a human can act on it.
+    const body = (await response!.json()) as { text?: string; blocks?: { type: string; elements?: unknown[] }[] };
+    expect(body.text).toContain("Task queued");
+    const actions = body.blocks?.find((b) => b.type === "actions");
+    expect(JSON.stringify(actions)).toContain("a-77");
   });
 
   it("rejects an invalid Slack signature with 401 and queues nothing", async () => {

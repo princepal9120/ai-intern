@@ -7,6 +7,11 @@
 # Optional, HMAC verification of acknowledgment-only GitHub webhooks.
 # GITHUB_WEBHOOK_SECRET=
 
+# Optional Slack wiring. SLACK_APPROVERS empty means nobody can approve.
+# SLACK_SIGNING_SECRET=
+# SLACK_APPROVERS=
+# SLACK_BOT_TOKEN=
+
 # AI Gateway uses the AI binding and GATEWAY_ID, not a container provider key.
 # Optional: sent as cf-aig-authorization on gateway requests (src/egress.ts).
 

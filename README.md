@@ -117,7 +117,7 @@ Bumping any of them requires re-running the P2 live acceptance run before claimi
 
 ## Slack
 
-Shipped: the `/ai-intern <github-repo-url> <task>` slash command (`POST /api/slack/command`), and the `app_mention` Events API endpoint (`POST /api/slack/events`) — both verified with HMAC-SHA256 and a 5-minute replay window. The events path acks in under 3 seconds, dedupes on `event_id` so a Slack retry cannot produce two runs, groups message bursts into one run, gathers thread context with secret redaction, and posts an in-thread Block Kit approval card gated by the `SLACK_APPROVERS` allowlist. One thread is one orchestrator conversation.
+Shipped: the `/ai-intern <github-repo-url> <task>` slash command (`POST /api/slack/command`), verified with HMAC-SHA256 and a 5-minute replay window. It queues a durable pending approval and replies with an in-thread Block Kit approval card whose Approve/Reject buttons dispatch to the orchestrator, gated by the `SLACK_APPROVERS` allowlist (unset = nobody can approve from Slack). The Events API endpoint (`POST /api/slack/events`) acks and dedupes on `event_id`; **mention-triggered dispatch is not shipped** — a mention acks but starts no run. The slash command, not mentions, is the Slack entry point.
 
 **`SLACK_APPROVERS` unset means nobody can approve from Slack.** That is deliberate: a valid signature authenticates Slack, not the human who clicked, and a Block Kit button in a public channel is clickable by every member.
 
@@ -125,7 +125,7 @@ No P3 live workspace verification is claimed. The P3 acceptance bar in `PLAN.md`
 
 ## Automations
 
-Shipped: schedule (five-field cron, 5-minute floor, missed ticks coalesced), GitHub, Slack, incoming-webhook, and manual triggers, OR'd together at most one run per event. A `runWhen` sentence on any trigger is checked by the cheap Workers AI model before the run starts and **fails closed** — a model error or an unparseable answer means no run, with the reason recorded.
+Implemented: the trigger-rule engine (schedule with a five-field cron and 5-minute floor, missed ticks coalesced; GitHub, Slack, incoming-webhook, and manual triggers, OR'd together at most one run per event). **Not shipped: the runner** — no `scheduled()` handler, no cron trigger, and no Automations Durable Object exist yet, so nothing fires unattended. A `runWhen` sentence on any trigger is checked by the cheap Workers AI model before the run starts and **fails closed** — a model error or an unparseable answer means no run, with the reason recorded.
 
 Safety, all three required together: approval by default, opt-in unattended mode refused unless opening a PR is the only mutation *and* the repo is allowlisted, and a daily run budget per automation. Kill switches: `enabled` per automation, `AUTOMATIONS_ENABLED` globally. Not verified live.
 

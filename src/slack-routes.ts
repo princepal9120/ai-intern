@@ -9,12 +9,14 @@
 import { getAgentByName } from "agents/routing";
 import type { Env } from "./env.js";
 import { parseGitHubRepoUrl } from "./security.js";
+import { buildApprovalBlocks } from "./slack-approval.js";
 import { verifySlackRequest } from "./slack.js";
 
 export const SLACK_COMMAND_PATH = "/api/slack/command";
 export const SLASH_COMMAND = "/ai-intern";
 
-const ORCHESTRATOR_NAME = "default";
+/** One shared orchestrator conversation; queue and approvals both resolve on it. */
+export const ORCHESTRATOR_NAME = "default";
 
 export interface OrchestratorStub {
   fetch: (request: Request) => Promise<Response>;
@@ -122,8 +124,19 @@ export async function handleSlackCommand(
   if (!queued.ok) {
     return Response.json({ error: "Failed to queue orchestrator run." }, { status: 502 });
   }
+  const queuedBody = (await queued.json().catch(() => ({}))) as { approvalId?: string };
+  if (!queuedBody.approvalId) {
+    return Response.json({ error: "Orchestrator did not return an approval id." }, { status: 502 });
+  }
+  // The card rides in the command reply — no bot token needed to deliver it.
   return Response.json({
     response_type: "ephemeral",
     text: `Task queued for ${parsed.repoUrl}: ${parsed.task}`,
+    blocks: buildApprovalBlocks({
+      threadKey: ORCHESTRATOR_NAME,
+      approvalId: queuedBody.approvalId,
+      repoUrl: parsed.repoUrl,
+      task: parsed.task,
+    }),
   });
 }

@@ -16,6 +16,7 @@
  * `ctx.waitUntil` when a context is provided.
  */
 import type { Env } from "./env.js";
+import { redactSecrets } from "./security.js";
 import { verifySlackRequest } from "./slack.js";
 
 export const SLACK_INTERACT_PATH = "/api/slack/interact";
@@ -154,7 +155,22 @@ function parseBlockActionsPayload(payloadParam: string | null): BlockActionPaylo
   if (userId === "" || actionId === "" || value === "" || responseUrl === "") {
     throw new Error("Interaction payload is missing user, action, value, or response_url.");
   }
+  if (!isSlackResponseUrl(responseUrl)) {
+    throw new Error("Invalid Slack response URL.");
+  }
   return { userId, actionId, pointer: parseApprovalValue(value), responseUrl };
+}
+
+export function isSlackResponseUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" &&
+      ["hooks.slack.com", "hooks.slack-gov.com"].includes(url.hostname) &&
+      url.username === "" && url.password === "" && url.port === "" &&
+      url.pathname.startsWith("/actions/");
+  } catch {
+    return false;
+  }
 }
 
 async function respondEphemeral(
@@ -166,11 +182,11 @@ async function respondEphemeral(
     await respond(responseUrl, text);
     return;
   }
-  // Best effort: response_url is Slack's short-lived (30 min, 5 uses) card
-  // callback. Never let its failure fail the ack.
+  // Callback failure must not fail the already-acknowledged interaction.
   try {
     await fetch(responseUrl, {
       method: "POST",
+      redirect: "error",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ response_type: "ephemeral", replace_original: false, text }),
     });
@@ -185,7 +201,7 @@ async function dispatchToOrchestrator(
   approved: boolean,
   userId: string,
 ): Promise<void> {
-  await stub.fetch(
+  const response = await stub.fetch(
     new Request("https://internal/api/approvals", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -198,6 +214,9 @@ async function dispatchToOrchestrator(
       }),
     }),
   );
+  if (!response.ok) {
+    throw new Error(`Approval dispatch failed (${response.status}).`);
+  }
 }
 
 /**
@@ -282,20 +301,17 @@ export async function handleSlackInteract(
         dispatchToOrchestrator(deps.orchestratorStub as { fetch: (r: Request) => Promise<Response> }, pointer, false, userId)
       : undefined);
   const work = (async () => {
-    if (approved) {
-      await dispatchApprove?.(interaction.pointer, interaction.userId);
-    } else {
-      // Reject resolves the pending call; it never starts a container.
-      await dispatchReject?.(interaction.pointer, interaction.userId);
-    }
+    const dispatch = approved ? dispatchApprove : dispatchReject;
+    if (!dispatch) throw new Error("Approval dispatch is not configured.");
+    await dispatch(interaction.pointer, interaction.userId);
   })();
   // The ack already went out, so a dispatch failure must surface to the human
   // in Slack rather than vanish into an unhandled rejection.
   const reported = work.catch((error: unknown) => {
-    const detail = error instanceof Error ? error.message : String(error);
+    console.error("Slack approval dispatch failed", redactSecrets(String(error)));
     return respondEphemeral(
       interaction.responseUrl,
-      `The ${approved ? "approval" : "rejection"} could not be recorded: ${detail}`,
+      `The ${approved ? "approval" : "rejection"} could not be recorded. Contact the installation administrator.`,
       deps.respond,
     );
   });

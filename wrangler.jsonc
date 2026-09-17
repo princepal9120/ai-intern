@@ -16,7 +16,12 @@
     "ORCHESTRATOR_MODEL": "@cf/meta/llama-3.1-8b-instruct",
     "CODING_MODEL": "google/gemini-3.5-flash-lite",
     "RUNTIME": "sandbox",
+    // Must match containers.instance_type. Cloudbox-style deploy-time size knob.
+    "INSTANCE_TYPE": "standard-1",
   },
+  "r2_buckets": [
+    { "binding": "SNAPSHOTS", "bucket_name": "ai-intern-snapshots" },
+  ],
   "ai": {
     "binding": "AI",
   },
@@ -36,9 +41,5 @@
       "max_instances": 5,
     },
   ],
-  // T18: 5-minute floor tick driving the automations scheduled() fan-out.
-  // Per-automation crons live in the Automations DO; missed ticks coalesce
-  // into one run (see src/automations.ts isScheduleDue).
-  "triggers": { "crons": ["*/5 * * * *"] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CodingOrchestrator", "OpenCodeAgent", "Sandbox"] }],
 }

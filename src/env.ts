@@ -25,6 +25,19 @@ export interface Env {
   AGENT_HARNESS?: string;
   /** "sandbox" (default) or "computer" (preview-only refusal). */
   RUNTIME?: string;
+  /**
+   * Deploy-time container size. Must match wrangler `containers.instance_type`.
+   * lite | basic | standard-1 | standard-2 | standard-3 | standard-4.
+   */
+  INSTANCE_TYPE?: string;
+  /** Optional R2 bucket for stop/resume/fork workspace snapshots. */
+  SNAPSHOTS?: R2Bucket;
+  /** Optional. Verifies Slack callbacks; unset disables all Slack routes. */
+  SLACK_SIGNING_SECRET?: string;
+  /** Optional. Comma-separated Slack user ids allowed to approve; unset = nobody. */
+  SLACK_APPROVERS?: string;
+  /** Optional. Bot token used only to post approval cards (chat.postMessage). */
+  SLACK_BOT_TOKEN?: string;
   /** Optional. Required only to open pull requests. Never sent to containers. */
   GITHUB_TOKEN?: string;
   /** Optional. Server-side credential for AI Gateway. Never sent to containers. */

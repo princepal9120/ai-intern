@@ -19,14 +19,24 @@ import {
   RunStore,
   canStartRun,
   createRun,
+  isActiveStatus,
+  reclaimStaleRuns,
   type DelegatedRun,
   type RunStatus,
 } from "../runs.js";
+import {
+  createPendingApproval,
+  pruneExpiredApprovals,
+  resolvePendingApproval,
+  type PendingApproval,
+  type ResolveResult,
+} from "../pending-approvals.js";
 import { makeSandboxId, parseGitHubRepoUrl, redactSecrets } from "../security.js";
 import { OpenCodeAgent } from "./opencode-agent.js";
 
 export interface OrchestratorState {
   runs: DelegatedRun[];
+  pendingApprovals?: PendingApproval[];
 }
 
 const delegateInputSchema = z.object({
@@ -53,11 +63,27 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
   /** The orchestrator plans and delegates; it never runs shell commands. */
   override workspaceBash = false;
 
+  // Abort signal per active run so cancel/reclaim reaches the child container,
+  // not just the registry row. Lazy: DO subclasses may be constructed without
+  // the base constructor in tests.
+  private runControllersMap: Map<string, AbortController> | undefined;
+  private get runControllers(): Map<string, AbortController> {
+    return (this.runControllersMap ??= new Map());
+  }
+
   private get store(): RunStore {
     return new RunStore(
       () => this.state?.runs ?? [],
-      (runs) => this.setState({ runs }),
+      (runs) => this.setState({ ...this.state, runs }),
     );
+  }
+
+  private get approvals(): PendingApproval[] {
+    return this.state?.pendingApprovals ?? [];
+  }
+
+  private writeApprovals(next: PendingApproval[]): void {
+    this.setState({ ...this.state, pendingApprovals: next });
   }
 
   override getModel(): string {
@@ -94,8 +120,8 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
         "Requires human approval before anything runs.",
       inputSchema: delegateInputSchema,
       needsApproval: true,
-      execute: async (input: DelegateInput, options?: { toolCallId?: string }) => {
-        return this.executeDelegatedTask(input, childExecute, options?.toolCallId);
+      execute: async (input: DelegateInput, options?: { toolCallId?: string; abortSignal?: AbortSignal }) => {
+        return this.executeDelegatedTask(input, childExecute, options?.toolCallId, options?.abortSignal);
       },
     });
     return { ...super.getTools(), delegate_coding_task: delegate };
@@ -105,7 +131,9 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
     input: DelegateInput,
     childExecute: NonNullable<ReturnType<typeof agentTool>["execute"]>,
     toolCallId: string | undefined,
+    abortSignal?: AbortSignal,
   ): Promise<string> {
+    await this.reclaimRuns();
     const runs = this.store.list();
     if (!canStartRun(runs)) {
       throw new Error(
@@ -144,8 +172,11 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
       this.store.transition(runId, status, patch);
     };
     this.store.transition(runId, "running");
+    const controller = new AbortController();
+    controller.signal.addEventListener("abort", () => this.runControllers.delete(runId), { once: true });
+    this.runControllers.set(runId, controller);
     try {
-      const output = await childExecute(formatAgentToolInput(fullInput), { toolCallId: callId });
+      const output = await childExecute(formatAgentToolInput(fullInput), { toolCallId: callId, abortSignal: abortSignal ?? controller.signal });
       if (typeof output === "string") {
         // The child reports status in a structured envelope. Trusting the transport
         // type instead would mark failed runs "completed".
@@ -167,35 +198,186 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
       const message = error instanceof Error ? error.message : String(error);
       finish("error", { error: redactSecrets(message).slice(0, 4000) });
       throw error;
+    } finally {
+      await this.destroySandbox(sandboxId);
     }
+  }
+
+  /**
+   * Queue a Slack-initiated task as a pending approval: the exact delegation
+   * input is frozen at queue time and nothing executes until a human
+   * resolves the pointer via POST /api/approvals.
+   */
+  private queueSlackRun(input: { repoUrl?: unknown; task?: unknown; baseBranch?: unknown; publishPullRequest?: unknown }): Response {
+    const repoUrl = typeof input.repoUrl === "string" ? input.repoUrl : "";
+    const task = typeof input.task === "string" ? input.task : "";
+    try {
+      parseGitHubRepoUrl(repoUrl);
+    } catch (error) {
+      return Response.json({ error: error instanceof Error ? error.message : "Invalid repository URL." }, { status: 400 });
+    }
+    if (!task.trim()) {
+      return Response.json({ error: "Task description is required." }, { status: 400 });
+    }
+    const publishPullRequest = input.publishPullRequest === true;
+    if (publishPullRequest && !this.env.GITHUB_TOKEN) {
+      return Response.json({ error: "publishPullRequest was requested but GITHUB_TOKEN is not configured." }, { status: 400 });
+    }
+    const approvalId = crypto.randomUUID();
+    try {
+      this.writeApprovals(createPendingApproval(this.approvals, {
+        threadKey: "default",
+        approvalId,
+        repoUrl,
+        task: task.slice(0, 4000),
+        baseBranch: typeof input.baseBranch === "string" && input.baseBranch.trim() ? input.baseBranch.slice(0, 200) : "main",
+        publishPullRequest,
+        createdAt: Date.now(),
+      }));
+    } catch (error) {
+      return Response.json({ error: error instanceof Error ? error.message : "Could not queue approval." }, { status: 409 });
+    }
+    return Response.json({ ok: true, approvalId, repoUrl, task: task.slice(0, 4000) });
+  }
+
+  /**
+   * Resolve an approval pointer exactly once. Approve executes the frozen
+   * input through delegate_coding_task (the same gated path as the
+   * dashboard); reject resolves without starting anything.
+   */
+  private async resolveApproval(body: {
+    threadKey?: unknown; approvalId?: unknown; approved?: unknown; decidedBy?: unknown;
+  }): Promise<Response> {
+    const { threadKey, approvalId, approved, decidedBy: rawDecidedBy } = body;
+    if (typeof threadKey !== "string" || typeof approvalId !== "string" || typeof approved !== "boolean") {
+      return Response.json({ error: "Invalid approval payload." }, { status: 400 });
+    }
+    const decidedBy = typeof rawDecidedBy === "string" && rawDecidedBy.trim() ? rawDecidedBy.slice(0, 200) : "unknown";
+    // Preflight before consuming the pointer: a failed start must leave the
+    // approval retryable, not burned as "approved" with nothing to show.
+    if (approved) {
+      await this.reclaimRuns();
+      if (!canStartRun(this.store.list())) {
+        return Response.json({ error: "All coding runs are busy. Approve again when a slot frees." }, { status: 409 });
+      }
+      const record = this.approvals.find((a) => a.approvalId === approvalId && a.threadKey === threadKey);
+      if (record && record.publishPullRequest && !this.env.GITHUB_TOKEN) {
+        return Response.json({ error: "publishPullRequest was requested but GITHUB_TOKEN is not configured." }, { status: 400 });
+      }
+      if (record) {
+        try {
+          parseGitHubRepoUrl(record.repoUrl);
+        } catch (error) {
+          return Response.json({ error: error instanceof Error ? error.message : "Invalid repository URL." }, { status: 400 });
+        }
+      }
+    }
+    const result = resolvePendingApproval(this.approvals, { threadKey, approvalId, approved, decidedBy }, Date.now());
+    this.writeApprovals(pruneExpiredApprovals(result.approvals, Date.now()));
+    if (result.result === "approved") {
+      const record = result.approvals.find((a) => a.approvalId === approvalId);
+      if (record) {
+        const delegate = this.getTools()["delegate_coding_task"] as {
+          execute: (input: unknown, options?: unknown) => Promise<unknown>;
+        };
+        const execution = Promise.resolve(delegate.execute(
+          {
+            repoUrl: record.repoUrl,
+            task: record.task,
+            baseBranch: record.baseBranch ?? "main",
+            publishPullRequest: record.publishPullRequest ?? false,
+          },
+          { toolCallId: approvalId },
+        ));
+        // The HTTP ack must not wait on a container run.
+        void execution.catch(() => {});
+      }
+    }
+    return Response.json({ result: result.result satisfies ResolveResult });
   }
 
   /** Cancel a retained run and destroy its sandbox. Returns null when unknown. */
   async cancelRun(runId: string): Promise<DelegatedRun | null> {
     const run = this.store.get(runId);
     if (!run) return null;
+    if (!isActiveStatus(run.status)) return run;
     const updated = this.store.transition(runId, "cancelled");
-    try {
-      const { getSandbox } = await import("@cloudflare/sandbox");
-      await getSandbox(this.env.Sandbox, run.sandboxId).destroy();
-    } catch (error) {
-      // Best effort: the registry already records the cancellation.
-      console.warn(`Failed to destroy sandbox ${run.sandboxId}: ${redactSecrets(String(error))}`);
-    }
+    this.runControllers.get(runId)?.abort();
+    await this.destroySandbox(run.sandboxId);
     return updated;
   }
 
+  private async destroySandbox(sandboxId: string): Promise<void> {
+    try {
+      const { getSandbox } = await import("@cloudflare/sandbox");
+      await getSandbox(this.env.Sandbox, sandboxId).destroy();
+    } catch (error) {
+      // Cleanup failure must not overwrite the recorded outcome.
+      console.warn(`Failed to destroy sandbox ${sandboxId}: ${redactSecrets(String(error))}`);
+    }
+  }
+
+  private async reclaimRuns(): Promise<void> {
+    const { runs, reclaimed } = reclaimStaleRuns(this.store.list(), Date.now());
+    if (reclaimed.length === 0) return;
+    this.setState({ ...this.state, runs });
+    await Promise.all(runs.filter((run) => reclaimed.includes(run.runId)).map(async (run) => {
+      this.runControllers.get(run.runId)?.abort();
+      await this.destroySandbox(run.sandboxId);
+    }));
+  }
+
   async clearRuns(): Promise<void> {
-    this.store.clear();
+    // Pending Slack approvals survive Clear: they are not run history, and
+    // dropping them would silently strand a queued card's pointer.
+    const runs = this.store.list();
+    const removed = new Set(runs.map((run) => run.runId));
+    await Promise.all(runs.filter((run) => isActiveStatus(run.status))
+      .map((run) => this.cancelRun(run.runId)));
+    // Do not drop runs admitted while sandbox cleanup was awaiting I/O.
+    this.setState({ ...this.state, runs: this.store.list().filter((run) => !removed.has(run.runId)) });
   }
 
   override async onRequest(request: Request): Promise<Response> {
     const url = new URL(request.url);
+    if (request.method === "POST" && url.pathname === "/api/approvals") {
+      let approvalBody: unknown;
+      try {
+        approvalBody = await request.json();
+      } catch {
+        return Response.json({ error: "Request body is not valid JSON." }, { status: 400 });
+      }
+      if (typeof approvalBody !== "object" || approvalBody === null || Array.isArray(approvalBody)) {
+        return Response.json({ error: "Request body must be a JSON object." }, { status: 400 });
+      }
+      return this.resolveApproval(approvalBody as Record<string, unknown>);
+    }
     const match = url.pathname.match(/^\/api\/runs(?:\/([^/]+))?$/);
     if (!match) {
       return super.onRequest(request);
     }
-    const id = match[1] ? decodeURIComponent(match[1]) : null;
+    if (request.method === "POST" && url.pathname === "/api/runs") {
+      let queueBody: unknown;
+      try {
+        queueBody = await request.json();
+      } catch {
+        return Response.json({ error: "Request body is not valid JSON." }, { status: 400 });
+      }
+      if (typeof queueBody !== "object" || queueBody === null || Array.isArray(queueBody)) {
+        return Response.json({ error: "Request body must be a JSON object." }, { status: 400 });
+      }
+      return this.queueSlackRun(queueBody as Record<string, unknown>);
+    }
+    if (request.method !== "GET" && request.method !== "DELETE") {
+      return Response.json({ error: "Method not allowed." }, { status: 405 });
+    }
+    let id: string | null;
+    try {
+      id = match[1] ? decodeURIComponent(match[1]) : null;
+    } catch {
+      return Response.json({ error: "Invalid run ID." }, { status: 400 });
+    }
+    await this.reclaimRuns();
     if (request.method === "GET" && id === null) {
       return Response.json({ runs: this.store.list() });
     }

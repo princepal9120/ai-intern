@@ -21,19 +21,9 @@ Automations support up to 20 triggers evaluated together (`OR` semantics). When 
 
 ---
 
-## How scheduled crons work
+## Status: trigger engine only
 
-Automations are driven by Cloudflare Workers cron triggers declared in `wrangler.jsonc`:
-
-```jsonc
-"triggers": { "crons": ["*/5 * * * *"] }
-```
-
-Every 5 minutes, Cloudflare fires a `scheduled()` event to the Worker. The Worker queries the Automations Durable Object:
-
-1. **Evaluates Due Schedules**: Inspects all enabled automations to determine if their cron schedule is due.
-2. **Coalescing**: If multiple ticks occurred during a downtime or maintenance window, missed occurrences coalesce into **one single run** rather than creating a runaway backlog.
-3. **Approval Gating**: Generated automation plans appear in your dashboard (`/app/`) or Slack channel for approval before any code changes are committed.
+The trigger engine (`src/automations.ts`) is implemented and unit-tested, but **no scheduler ships yet**: `wrangler.jsonc` has no `triggers.crons` and the Worker has no `scheduled()` handler, and there is no Automations Durable Object or API to create automation records yet. Nothing fires on its own. The sections below describe the designed behavior for when the runner is built — not what the deployed Worker does today.
 
 ---
 

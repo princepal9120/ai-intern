@@ -3,21 +3,21 @@
 @tailwind utilities;
 
 :root {
-  --bg: #0f1419;
-  --panel: #182028;
-  --panel-elevated: #1e2832;
-  --line: #2a3441;
-  --line-light: #384656;
+  --bg: #000000;
+  --panel: #0a0c10;
+  --panel-elevated: #11141b;
+  --line: #222733;
+  --line-light: #333b4d;
   --text: #e6edf3;
   --muted: #8b98a9;
-  --accent: #4f9cf0;
-  --accent-ink: #06121f;
-  --brand: #0B9F95;
-  --brand-light: #2dd4bf;
+  --accent: #63c8c1;
+  --accent-ink: #000000;
+  --brand: #63c8c1;
+  --brand-light: #72d6cf;
   --danger: #f06666;
   --ok: #4cc38a;
   --pending: #c9a227;
-  --running: #4f9cf0;
+  --running: #4db4b0;
   --radius: 12px;
   --space: 8px;
   --gutter: 16px;
@@ -45,16 +45,16 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f1419;
+  background: #000000;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2a3441;
+  background: #222733;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #384656;
+  background: #333b4d;
 }
 
 /* Focus styles */

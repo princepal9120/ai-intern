@@ -91,11 +91,19 @@ export class SandboxRuntimeAdapter implements RuntimeAdapter {
     const config = this.harness.configFile(input, input.sandboxId);
 
     throwIfAborted(opts?.signal);
-    await emit({ phase: "clone", message: `Cloning ${input.repoUrl} (branch ${input.baseBranch}).`, fraction: 0.05 });
-    try {
-      await ops.gitCheckout(input.repoUrl, { branch: input.baseBranch, targetDir: workdir });
-    } catch (error) {
-      return failureResult(`Clone failed: ${shortError(error)}`, 0, "");
+    if (input.skipClone) {
+      await emit({
+        phase: "clone",
+        message: `Restored snapshot for ${input.repoUrl} (branch ${input.baseBranch}); skip clone.`,
+        fraction: 0.05,
+      });
+    } else {
+      await emit({ phase: "clone", message: `Cloning ${input.repoUrl} (branch ${input.baseBranch}).`, fraction: 0.05 });
+      try {
+        await ops.gitCheckout(input.repoUrl, { branch: input.baseBranch, targetDir: workdir });
+      } catch (error) {
+        return failureResult(`Clone failed: ${shortError(error)}`, 0, "");
+      }
     }
 
     await emit({ phase: "configure", message: "Writing isolated OpenCode config.", fraction: 0.15 });
@@ -295,20 +303,33 @@ export function unescapePorcelainPath(path: string): string {
   if (!(path.startsWith('"') && path.endsWith('"') && path.length >= 2)) return path;
   const inner = path.slice(1, -1);
   let out = "";
+  // Consecutive octal escapes are UTF-8 bytes; decode runs together or
+  // multi-byte characters corrupt (café -> cafÃ©).
+  const bytes: number[] = [];
+  const flush = () => {
+    if (bytes.length > 0) {
+      out += new TextDecoder().decode(new Uint8Array(bytes));
+      bytes.length = 0;
+    }
+  };
   for (let i = 0; i < inner.length; i++) {
     const ch = inner[i];
     if (ch !== "\\") {
+      flush();
       out += ch;
       continue;
     }
     const next = inner[i + 1];
     if (next === "n") {
+      flush();
       out += "\n";
       i += 1;
     } else if (next === "t") {
+      flush();
       out += "\t";
       i += 1;
     } else if (next === '"' || next === "\\") {
+      flush();
       out += next;
       i += 1;
     } else if (next !== undefined && next >= "0" && next <= "7") {
@@ -318,13 +339,15 @@ export function unescapePorcelainPath(path: string): string {
         oct += inner[j];
         j += 1;
       }
-      out += String.fromCharCode(parseInt(oct, 8));
+      bytes.push(parseInt(oct, 8));
       i = j - 1;
     } else if (next !== undefined) {
+      flush();
       out += next;
       i += 1;
     }
   }
+  flush();
   return out;
 }
 
@@ -341,7 +364,8 @@ function porcelainRenameOld(rest: string): string | null {
 }
 
 function isSafeRepoPath(path: string): boolean {
-  return Boolean(path) && !path.includes("..") && !path.startsWith("/");
+  // Only ".." as a whole segment escapes the workdir; "notes..txt" is a legal name.
+  return Boolean(path) && !path.split("/").includes("..") && !path.startsWith("/");
 }
 
 /** Parse `git status --porcelain` output into repo-relative paths. */
@@ -387,7 +411,15 @@ async function collectChanges(ops: SandboxOps, workdir: string, signal?: AbortSi
   if (status.exitCode !== 0) {
     throw new Error(`git status failed: ${boundTail(status.stderr, 1000)}`);
   }
-  const changedFiles = parsePorcelainStatus(status.stdout).slice(0, MAX_CAPTURED_FILES);
+  const allChanged = parsePorcelainStatus(status.stdout);
+  // A tree past the caps must fail the run, not publish a silent partial PR.
+  if (allChanged.length > MAX_CAPTURED_FILES) {
+    throw new Error(
+      `Run changed ${allChanged.length} files; capture limit is ${MAX_CAPTURED_FILES}. ` +
+        "Narrow the task or raise MAX_CAPTURED_FILES.",
+    );
+  }
+  const changedFiles = allChanged;
   const deletedFiles = parsePorcelainDeleted(status.stdout);
   // Intent-to-add makes new files show up in the worktree diff.
   // Deleted files are already tracked, so they don't need -N.
@@ -415,7 +447,6 @@ async function collectChanges(ops: SandboxOps, workdir: string, signal?: AbortSi
   let totalChars = 0;
   for (const path of changedFiles) {
     if (deletedFiles.has(path)) continue;
-    if (totalChars >= MAX_TOTAL_FILE_CHARS) break;
     const fullPath = `${workdir}/${path}`;
     // The ops layer enforces maxBytes and throws instead of truncating, so a
     // captured file is always complete or the whole run reports the error.
@@ -428,6 +459,11 @@ async function collectChanges(ops: SandboxOps, workdir: string, signal?: AbortSi
       totalChars += content.length;
     } else {
       totalChars += Math.ceil(content.length * 3 / 4);
+    }
+    if (totalChars > MAX_TOTAL_FILE_CHARS) {
+      throw new Error(
+        "Captured file content exceeds MAX_TOTAL_FILE_CHARS; refusing to publish a partial tree.",
+      );
     }
     files.push({ path, content, encoding: read.kind });
   }

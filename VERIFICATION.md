@@ -1,6 +1,6 @@
 # Verification Results
 
-**Last run: 2026-09-17.**
+**Last run: 2026-09-18.**
 
 ## Status: PASS with one documented environment limitation
 
@@ -8,9 +8,10 @@
 |-------|--------|
 | `pnpm typecheck` | PASS |
 | `pnpm lint` | PASS |
-| `pnpm test` | PASS (285/288 across 22 files; 3 skip without `pnpm build` output) |
-| `pnpm build` | PASS |
-| `npx wrangler deploy --dry-run` | **FAIL: Docker CLI not available on this machine** |
+| `pnpm test` | PASS (319/319 across 27 files) |
+| `pnpm build` | PASS (docs: 22 pages, 913 links verified) |
+| `pnpm docs:check` | PASS |
+| `npx wrangler deploy --dry-run` | **NOT RUN this pass: Docker CLI exists (`/opt/homebrew/bin/docker`) but no daemon is reachable (OrbStack socket absent).** |
 | Live cloud run (PLAN.md T10) | **NOT ATTEMPTED** |
 
 ## Limitations, stated plainly
@@ -33,7 +34,14 @@ Specifically unmeasured: peak container memory (which decides `basic` vs `standa
 
 ## Fix history
 
-**2026-09-17 (this pass)**
+**2026-09-18 (review-findings pass)**
+- Slack approval lane closed end to end: POST /api/runs queues a durable pending approval in the orchestrator DO (frozen delegation input, 30-min TTL, resolve-exactly-once, non-object bodies rejected at the route); the slash-command reply carries the Block Kit card; /api/slack/interact dispatches allowlisted clicks to the shared orchestrator (previously fail-closed). Mention dispatch via /api/slack/events remains unshipped (acks + dedupes only).
+- Run lifecycle: 30-minute deadline reclaim (reclaim-on-access), cancellation propagation via per-run AbortController, terminal runs immutable, sandbox destroyed on cancel/reclaim/finish.
+- Capture integrity: oversized trees fail the run instead of publishing a partial PR; `..` now rejected as a whole path segment only.
+- Dead cron trigger removed from wrangler.jsonc (finding #4); dashboard identity via /api/whoami (finding #5).
+- Correctness-pass fixes: porcelain octal escapes decode as UTF-8 (non-ASCII paths no longer fail change collection); approve preflights concurrency cap/token/URL before consuming the pointer (409 keeps it retryable); run deadline 30 -> 45 min, above the worst-case phase budget.
+
+**2026-09-17 (earlier pass)**
 - T6: scoped the GitHub credential per run; extracted `src/egress.ts` so the security-critical handlers are testable at all (`src/sandbox.ts` imports `cloudflare:` builtins and cannot load under vitest).
 - T19/T20: `run_when` gate and the three automation safety controls.
 - B10: `MAX_CONCURRENT_RUNS` 3 → 5, matching `max_instances`. The tests hardcoded 3 and are now limit-relative.

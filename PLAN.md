@@ -60,7 +60,7 @@ Baseline: **269 tests passing across 21 files**, typecheck and lint clean. Rev 3
 |---|---|
 | T1 SQLite migration · T2 instance type · T3 live model id · T4 delete dead provider path | **Done.** |
 | T5 egress allowlist · T7 Access gating · T8 result envelope · T9 progress streaming · T11 sleep tail | **Done.** |
-| T12–T17 Slack, end to end | **Done.** |
+| T12–T17 Slack: command lane shipped (queue → approval card in reply → allowlisted click → DO resolve → frozen input runs); mention dispatch and bot-token card posting **not shipped** — events endpoint acks + dedupes only | **Partial.** |
 | T18 automations trigger engine · T21 harness seam | **Done.** |
 | T24 README · T25 deploy button · T26 pins | **Done.** |
 | **T6 scoped GitHub credential** | **Done in rev 4.** `github.com` now defaults to *refusal*; `approveRepoScope("/owner/repo")` installs the scoped forwarder before the clone. Stricter than this plan's sketch, which left the open forwarder as the default. Handlers moved to `src/egress.ts` — `src/sandbox.ts` imports `cloudflare:` builtins and cannot load under vitest, which is why this code was previously untested. |
