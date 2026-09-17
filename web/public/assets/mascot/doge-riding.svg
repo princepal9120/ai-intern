@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%">
+  <!-- High-tech hoverboard / jetboard with flames -->
+  <ellipse cx="200" cy="240" rx="150" ry="24" fill="#111111" stroke="#2DD4BF" stroke-width="8"/>
+  <ellipse cx="200" cy="240" rx="130" ry="14" fill="#0B9F95"/>
+  <!-- Thruster glow -->
+  <path d="M 60 245 Q 20 250 5 260 Q 30 255 70 250 Z" fill="#2DD4BF" opacity="0.8"/>
+  <path d="M 340 245 Q 380 250 395 260 Q 370 255 330 250 Z" fill="#2DD4BF" opacity="0.8"/>
+
+  <!-- Doge standing cool on board -->
+  <!-- Body -->
+  <path d="M 160 140 Q 140 220 180 230 Q 220 230 240 140 Z" fill="#E89B3D" stroke="#000000" stroke-width="8"/>
+  <!-- Paws on board -->
+  <ellipse cx="170" cy="235" rx="18" ry="10" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+  <ellipse cx="230" cy="235" rx="18" ry="10" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+
+  <!-- Head with cool shades -->
+  <circle cx="200" cy="100" r="50" fill="#E89B3D" stroke="#000000" stroke-width="8"/>
+  <!-- Ears wind-blown -->
+  <path d="M 155 80 L 130 35 Q 165 40 175 70 Z" fill="#D68326" stroke="#000000" stroke-width="6"/>
+  <path d="M 245 80 L 270 35 Q 235 40 225 70 Z" fill="#D68326" stroke="#000000" stroke-width="6"/>
+
+  <!-- Sunglasses -->
+  <rect x="165" y="85" width="32" height="25" rx="6" fill="#3FA5EB" stroke="#000000" stroke-width="6"/>
+  <rect x="203" y="85" width="32" height="25" rx="6" fill="#3FA5EB" stroke="#000000" stroke-width="6"/>
+  <line x1="197" y1="95" x2="203" y2="95" stroke="#000000" stroke-width="6"/>
+  <!-- Glare -->
+  <line x1="172" y1="88" x2="182" y2="105" stroke="#FFFFFF" stroke-width="3"/>
+  <line x1="210" y1="88" x2="220" y2="105" stroke="#FFFFFF" stroke-width="3"/>
+
+  <!-- Muzzle & Snout -->
+  <ellipse cx="200" cy="120" rx="18" ry="12" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+  <ellipse cx="200" cy="115" rx="5" ry="3" fill="#000000"/>
+  <!-- Confident grin -->
+  <path d="M 190 125 Q 200 135 210 125" fill="none" stroke="#000000" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Speed wind lines -->
+  <line x1="40" y1="120" x2="100" y2="120" stroke="#2DD4BF" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+  <line x1="20" y1="150" x2="90" y2="150" stroke="#2DD4BF" stroke-width="5" stroke-linecap="round" opacity="0.7"/>
+  <line x1="50" y1="180" x2="110" y2="180" stroke="#2DD4BF" stroke-width="4" stroke-linecap="round" opacity="0.5"/>
+</svg>

@@ -29,13 +29,22 @@ export const SCHEDULE_FLOOR_MINUTES = 5;
 /** Worker-level cron tick that drives the scheduled() fan-out. */
 export const AUTOMATION_CRON_TICK = "*/5 * * * *";
 
-export interface ScheduleTrigger {
+/**
+ * T19: an optional plain-language condition checked by a cheap model before
+ * the run starts. Exact filters cannot express "only when it's actually a bug
+ * report"; this can.
+ */
+export interface TriggerBase {
+  runWhen?: string;
+}
+
+export interface ScheduleTrigger extends TriggerBase {
   kind: "schedule";
   /** Five-field cron (`minute hour dom month dow`). 5-minute floor enforced. */
   cron: string;
 }
 
-export interface GitHubTrigger {
+export interface GitHubTrigger extends TriggerBase {
   kind: "github";
   /** e.g. `"pull_request:opened"`, `"push"`. Bare names match any action. */
   events: string[];
@@ -46,7 +55,7 @@ export interface GitHubTrigger {
   labels?: string[];
 }
 
-export interface SlackTrigger {
+export interface SlackTrigger extends TriggerBase {
   kind: "slack";
   channels?: string[];
   authors?: string[];
@@ -54,11 +63,11 @@ export interface SlackTrigger {
   textContains?: string[];
 }
 
-export interface WebhookTrigger {
+export interface WebhookTrigger extends TriggerBase {
   kind: "webhook";
 }
 
-export interface ManualTrigger {
+export interface ManualTrigger extends TriggerBase {
   kind: "manual";
 }
 
@@ -80,6 +89,21 @@ export interface Automation {
   webhookSecret?: string;
   lastTriggeredAt?: number;
   runCount: number;
+  /**
+   * T20: opt-in unattended mode. Even when true a run is only unattended if
+   * it mutates nothing but a pull request AND its repo is listed in
+   * {@link unattendedRepos} — a PR is reviewable and revertible, nothing
+   * else is.
+   */
+  unattended?: boolean;
+  unattendedRepos?: string[];
+  /** T20 run budget. Defaults to {@link DEFAULT_DAILY_RUN_LIMIT}. */
+  dailyRunLimit?: number;
+  /** Runs charged against the current UTC day, with that day's start. */
+  runsToday?: number;
+  runDayStartedAt?: number;
+  /** T19: the most recent gate refusal, kept so a skip is never silent. */
+  lastSkip?: { at: number; reason: string };
 }
 
 export interface GitHubAutomationEvent {
@@ -524,9 +548,168 @@ export function matchAutomationEvent(
   return null;
 }
 
-/** Stamp a firing: set lastTriggeredAt and bump runCount. */
+/** Stamp a firing: set lastTriggeredAt, bump runCount, charge the daily budget. */
 export function recordTrigger(automation: Automation, nowMs: number = Date.now()): Automation {
-  return { ...automation, lastTriggeredAt: nowMs, runCount: automation.runCount + 1 };
+  const day = utcDayStart(nowMs);
+  const sameDay = automation.runDayStartedAt === day;
+  return {
+    ...automation,
+    lastTriggeredAt: nowMs,
+    runCount: automation.runCount + 1,
+    runsToday: (sameDay ? automation.runsToday ?? 0 : 0) + 1,
+    runDayStartedAt: day,
+  };
+}
+
+/** Record a gate refusal so the reason is surfaceable rather than lost. */
+export function recordSkip(automation: Automation, reason: string, nowMs: number = Date.now()): Automation {
+  return { ...automation, lastSkip: { at: nowMs, reason } };
+}
+
+// ---------------------------------------------------------------------------
+// T19 run_when gate · T20 safety
+// ---------------------------------------------------------------------------
+
+/** Runs per automation per UTC day before the budget refuses. */
+export const DEFAULT_DAILY_RUN_LIMIT = 20;
+
+function utcDayStart(nowMs: number): number {
+  return Math.floor(nowMs / 86_400_000) * 86_400_000;
+}
+
+/** Workers AI binding surface used by the gate — just enough to stub in tests. */
+export interface RunWhenAi {
+  run(model: string, input: { messages: { role: string; content: string }[] }): Promise<unknown>;
+}
+
+export interface RunWhenVerdict {
+  run: boolean;
+  reason: string;
+}
+
+function readModelAnswer(raw: unknown): string | null {
+  if (typeof raw === "string") return raw;
+  if (typeof raw === "object" && raw !== null) {
+    const response = (raw as { response?: unknown }).response;
+    if (typeof response === "string") return response;
+  }
+  return null;
+}
+
+/**
+ * T19. Asks the cheap orchestrator model whether `runWhen` holds for this
+ * event. Fails closed: a model error, an empty answer, or anything not
+ * clearly affirmative means no run, with the reason carried back.
+ */
+export async function evaluateRunWhen(
+  ai: RunWhenAi,
+  model: string,
+  runWhen: string,
+  eventSummary: string,
+): Promise<RunWhenVerdict> {
+  let answer: string | null;
+  try {
+    const raw = await ai.run(model, {
+      messages: [
+        {
+          role: "system",
+          content:
+            "Answer with exactly YES or NO. YES only if the condition clearly holds for the event.",
+        },
+        { role: "user", content: `Condition: ${runWhen}\n\nEvent:\n${eventSummary}` },
+      ],
+    });
+    answer = readModelAnswer(raw);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return { run: false, reason: `run_when gate failed closed: ${detail}` };
+  }
+  if (answer === null || answer.trim() === "") {
+    return { run: false, reason: "run_when gate failed closed: the model returned no answer." };
+  }
+  const verdict = answer.trim().toUpperCase();
+  if (verdict.startsWith("YES")) {
+    return { run: true, reason: `run_when matched: ${runWhen}` };
+  }
+  if (verdict.startsWith("NO")) {
+    return { run: false, reason: `run_when did not match: ${runWhen}` };
+  }
+  return { run: false, reason: `run_when gate failed closed: unparseable answer ${JSON.stringify(answer.trim().slice(0, 80))}` };
+}
+
+/** The one mutation safe to run unattended: a PR is reviewable and revertible. */
+export interface AutomationRunRequest {
+  publishPullRequest: boolean;
+  /** Any mutation beyond opening a PR — pushing to a branch, closing issues, … */
+  otherMutations?: string[];
+}
+
+export interface AutomationAuthorization {
+  allowed: boolean;
+  /** True unless unattended mode was granted. An automation schedules work; it does not authorize it. */
+  requiresApproval: boolean;
+  reason: string;
+}
+
+/**
+ * T20. The three required controls plus the kill switches, in one gate so a
+ * caller cannot apply two of three. `globalEnabled` is the
+ * `AUTOMATIONS_ENABLED` var.
+ */
+export function authorizeAutomationRun(
+  automation: Automation,
+  request: AutomationRunRequest,
+  nowMs: number = Date.now(),
+  globalEnabled = true,
+): AutomationAuthorization {
+  if (!globalEnabled) {
+    return { allowed: false, requiresApproval: true, reason: "Automations are disabled globally." };
+  }
+  if (!automation.enabled) {
+    return { allowed: false, requiresApproval: true, reason: `Automation ${automation.id} is disabled.` };
+  }
+  const limit = automation.dailyRunLimit ?? DEFAULT_DAILY_RUN_LIMIT;
+  const used = automation.runDayStartedAt === utcDayStart(nowMs) ? automation.runsToday ?? 0 : 0;
+  if (used >= limit) {
+    return {
+      allowed: false,
+      requiresApproval: true,
+      reason: `Daily run budget reached: ${used}/${limit} runs today.`,
+    };
+  }
+  const prOnly = request.publishPullRequest && (request.otherMutations ?? []).length === 0;
+  if (!automation.unattended) {
+    return { allowed: true, requiresApproval: true, reason: "Automated runs require approval by default." };
+  }
+  if (!prOnly) {
+    return {
+      allowed: true,
+      requiresApproval: true,
+      reason: "Unattended mode covers pull requests only; this run mutates more, so it needs approval.",
+    };
+  }
+  let repo: string;
+  try {
+    const parsed = parseGitHubRepoUrl(automation.repoUrl);
+    repo = `${parsed.owner}/${parsed.repo}`.toLowerCase();
+  } catch {
+    return { allowed: false, requiresApproval: true, reason: "Unattended mode needs a valid GitHub repo URL." };
+  }
+  const allowlist = (automation.unattendedRepos ?? []).map((entry) => entry.toLowerCase());
+  if (!allowlist.includes(repo)) {
+    return {
+      allowed: true,
+      requiresApproval: true,
+      reason: `Unattended mode refuses ${repo}: it is not on the automation's allowlist.`,
+    };
+  }
+  return { allowed: true, requiresApproval: false, reason: "Unattended: PR-only run on an allowlisted repo." };
+}
+
+/** `AUTOMATIONS_ENABLED` kill switch. Unset means enabled; "false"/"0"/"off" disable. */
+export function automationsEnabled(value: string | undefined): boolean {
+  if (value === undefined || value.trim() === "") return true;
+  return !["false", "0", "off", "no"].includes(value.trim().toLowerCase());
 }
 
 /** Extract the automation id from `/api/automations/{id}/trigger`, else null. */

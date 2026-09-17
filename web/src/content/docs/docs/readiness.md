@@ -9,28 +9,27 @@ The static documentation/dashboard build and mocked tests do not establish that 
 
 ## Remaining blockers
 
-- **Provider integration:** the public callback returns 503 deliberately. The internal Google helper now uses the AI Gateway binding, but Sandbox egress interception is not wired to it. Live coding is unavailable through the present callback path. WORKER_ORIGIN remains required by the orchestrator; CF_ACCOUNT_ID and AI_GATEWAY_TOKEN are legacy fields, not used by the helper.
-- **Authorization:** direct SDK child routes are not gated by the retained registry. Authentication must cover every reachable hostname and service path before exposure.
-- **Private cloning:** the GitHub token is used for publishing, not clone transport.
-- **Result fidelity:** the parent treats string child output as completed without parsing the structured result. Inspect transcripts rather than trusting the badge.
-- **Publication fidelity:** capture limits, deleted files, renames, modes, and binary/large-file round trips are not fully supported. Publishing is not a complete Git patch transport.
-- **Streaming:** phase events exist; per-event OpenCode JSON streaming is not implemented.
-- **Lifecycle:** cancellation is best-effort; registry clear is not complete data erasure or container shutdown.
+- **Live run (T10):** no dated cloud run is recorded. Local tests do not prove deploy, Access, or container billing. See `VERIFICATION.md`.
+- **Authorization:** `REQUIRE_ACCESS` only checks the Access email header — not JWT. Cover every hostname with Access; forge-header tests must still fail from outside Access.
+- **Harness image:** Dockerfile installs OpenCode only. `AGENT_HARNESS=claude-code` or `codex` fails at exec until a matching image exists.
+- **Private cloning:** path-scoped `GITHUB_TOKEN` is for github.com traffic of the approved repo; it is not a clone-time credential store.
+- **npm inside the sandbox:** `registry.npmjs.org` is off the egress allowlist on purpose.
+- **Lifecycle:** cancellation destroys the sandbox; idle tail is `sleepAfter = 1m`. Registry clear is not complete data erasure.
 
 ## Local acceptance
 
 ~~~sh
-npm ci
-npm run typecheck
-npm run lint
-npm test
-npm run docs:check
-npm run build
-npm run docs:verify
+pnpm install
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm docs:check
+pnpm build
+pnpm docs:verify
 npx wrangler deploy --dry-run
 ~~~
 
-Record actual failures, including missing container runtime/image support. Do not replace a dry run with a real deployment to get a green result. Review npm audit findings separately; do not force dependency upgrades without compatibility review.
+Record actual failures, including missing container runtime/image support. Do not replace a dry run with a real deployment to get a green result. Review package audit findings separately; do not force dependency upgrades without compatibility review.
 
 ## Account-owned integration acceptance (not executed by these docs)
 
@@ -47,4 +46,5 @@ After implementing the missing boundaries, use an isolated test installation and
 9. Check keyboard operation, narrow/desktop layouts, docs navigation/search, and missing-path 404 behavior.
 
 Record date, revisions, versions, environment, results, and unresolved failures. Mocked tests alone are insufficient to mark the product complete.
+
 

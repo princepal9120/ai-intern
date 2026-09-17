@@ -17,10 +17,12 @@ export interface Env {
   GATEWAY_ID: string;
   /** Model id for the parent planning agent (Workers AI id). */
   ORCHESTRATOR_MODEL: string;
-  /** Coding model in opencode provider/model format, e.g. google/gemini-2.0-flash. */
+  /** Coding model in opencode provider/model format, e.g. google/gemini-3.5-flash-lite. */
   CODING_MODEL: string;
-  /** Account id that owns the AI Gateway. Required for provider calls. */
-  CF_ACCOUNT_ID?: string;
+  /** Optional kill switch. "false"/"0"/"off" stops every automation firing. */
+  AUTOMATIONS_ENABLED?: string;
+  /** Agent harness: "opencode" (default), "claude-code", or "codex". */
+  AGENT_HARNESS?: string;
   /** "sandbox" (default) or "computer" (preview-only refusal). */
   RUNTIME?: string;
   /** Optional. Required only to open pull requests. Never sent to containers. */

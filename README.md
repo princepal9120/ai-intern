@@ -2,7 +2,7 @@
 
 An account-owned Cloudflare coding workspace: describe a GitHub task, review the proposed delegation, approve or reject it, and inspect a sandbox-generated diff. The runtime is Cloudflare Agents + Sandbox containers running OpenCode, with a React dashboard and Astro/Starlight documentation served by one Worker.
 
-**Status: local prototype, not production-ready.** No live end-to-end cloud run is claimed. `VERIFICATION.md` records the current evidence: `npm run typecheck`, `npm run lint`, `npm test` (111/111), and `npm run build` pass locally; `npx wrangler deploy --dry-run` fails on this machine because no Docker CLI is available to package the container image. Until a dated live run is recorded in `VERIFICATION.md` against the P2 acceptance bar in `PLAN.md` §15 (submit → approve → clone/code/collect with a diff that matches reality, rejection starting no container, honest failure exit codes, PR with deletions shown as deleted, peak memory measured), the honest status stays "local prototype".
+**Status: local prototype, not production-ready.** No live end-to-end cloud run is claimed. `VERIFICATION.md` records the current evidence: `pnpm typecheck`, `pnpm lint`, `pnpm test` (270/270), and `pnpm build` pass locally; `npx wrangler deploy --dry-run` fails on this machine because no Docker CLI is available to package the container image. Until a dated live run is recorded in `VERIFICATION.md` against the P2 acceptance bar in `PLAN.md` §15 (submit → approve → clone/code/collect with a diff that matches reality, rejection starting no container, honest failure exit codes, PR with deletions shown as deleted, peak memory measured), the honest status stays "local prototype".
 
 Provider traffic is intercepted at the Sandbox egress boundary and forwarded through the account owner's AI Gateway binding — there is no provider callback route (the dead callback path was deleted; the forwarder and its route no longer exist).
 
@@ -27,35 +27,35 @@ npx wrangler login
 # Optional account mutations:
 npx wrangler secret put GITHUB_TOKEN
 npx wrangler secret put GITHUB_WEBHOOK_SECRET
-npm run build
-npm run deploy
+pnpm build
+pnpm deploy
 ~~~
 
-These commands change the operator's account. They were not executed as part of this documentation work. npm run deploy invokes Wrangler; it does not automatically build the static assets first.
+These commands change the operator's account. They were not executed as part of this documentation work. pnpm deploy invokes Wrangler; it does not automatically build the static assets first.
 
 Protect every reachable hostname with Cloudflare Access or equivalent authentication. An obscure URL is not access control. Browser approval is not route authorization. Review the security docs before live operation.
 
 ## Local quickstart
 
-Requirements: Node.js **22.12.0+**, npm **9.6.5+**. A Docker CLI is also
+Requirements: Node.js **22.12.0+**, pnpm **10.0.0+**. A Docker CLI is also
 required for Wrangler container image packaging; a missing Docker daemon
 fails even the local dry run.
 
 ~~~sh
-npm ci
-npm run typecheck
-npm run lint
-npm test
-npm run docs:check
-npm run build
-npm run docs:preview
+pnpm install
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm docs:check
+pnpm build
+pnpm docs:preview
 ~~~
 
 Open **http://localhost:4321/docs/** to read the built documentation with search.
 
-- Dashboard only: npm run dev (port 5173; no Worker API proxy).
-- Docs editing: npm run docs:dev (port 4321/docs/; search requires a production build).
-- Built Worker/assets: npm run build, then npx wrangler dev. Containers require a compatible local engine; startup may fail without it.
+- Dashboard only: pnpm dev (port 5173; no Worker API proxy).
+- Docs editing: pnpm docs:dev (port 4321/docs/; search requires a production build).
+- Built Worker/assets: pnpm build, then npx wrangler dev. Containers require a compatible local engine; startup may fail without it.
 - Local deployment packaging: npx wrangler deploy --dry-run. This is not a deployment or proof of a live coding run.
 
 ## Documentation
@@ -95,7 +95,11 @@ Non-secret defaults in wrangler.jsonc:
 | CODING_MODEL | google/gemini-3.5-flash-lite |
 | RUNTIME | sandbox |
 
-Only google/* coding models are accepted (`buildOpencodeConfig` in `src/runtime.ts` rejects anything else). Model ids retire — `gemini-2.0-flash` was shut down 2026-06-01, which is why the default moved. Verify current availability in your account; the checked-in model name is not a service guarantee. The assistant model used to edit this project is independent of the application's runtime models.
+`CODING_MODEL` takes any `provider/model` the selected harness supports: `google/*`, `anthropic/*`, or `openai/*` for OpenCode; `anthropic/*` for Claude Code; `openai/*` for Codex. An unsupported pairing is refused at config time with a message naming what the harness does support. Set `AGENT_HARNESS` to choose (default `opencode`).
+
+Model ids retire — `gemini-2.0-flash` was shut down 2026-06-01, which is why the default moved. Verify current availability in your account; the checked-in model name is not a service guarantee. The assistant model used to edit this project is independent of the application's runtime models.
+
+Tokens dominate the bill — roughly 20–40× the Cloudflare compute cost — so provider choice, not container tuning, is the lever that matters. See `docs/costs`.
 
 Do not add provider credentials to the container. The container gets a dummy key (`DUMMY_PROVIDER_KEY`); the Sandbox Durable Object swaps in the real AI Gateway credential outside the container. Copy .dev.vars.example to the ignored .dev.vars for local configuration. Optional GITHUB_TOKEN is used for Worker-side publication, not private cloning. GITHUB_WEBHOOK_SECRET verifies acknowledgment-only webhook requests.
 
@@ -105,7 +109,7 @@ These versions are pinned because silent upgrades break the run contract:
 
 | Pin | Coupling |
 | --- | --- |
-| `opencode-ai@1.18.31` (Dockerfile) | `parseOpencodeEvent` in `src/runtime.ts` couples to its JSON event shape |
+| `opencode-ai@1.18.31` (Dockerfile) | `parseOpencodeEvent` in `src/harness/opencode.ts` couples to its JSON event shape. Each harness's parser couples to its own CLI the same way — a stream-format change makes a run appear to hang rather than fail, so treat harness CLI bumps as breaking. |
 | `@cloudflare/sandbox@0.12.9` (package.json) | Must match the base image tag `cloudflare/sandbox:0.12.9-opencode` |
 | `CODING_MODEL` (`google/gemini-3.5-flash-lite`) | Provider model ids retire without warning |
 
@@ -113,17 +117,27 @@ Bumping any of them requires re-running the P2 live acceptance run before claimi
 
 ## Slack
 
-Shipped: the `/ai-intern <github-repo-url> <task>` slash command (`POST /api/slack/command`), verified with HMAC-SHA256 and a 5-minute replay window, queues an orchestrator run and replies ephemerally. See `src/slack.ts` and `src/slack-routes.ts`.
+Shipped: the `/ai-intern <github-repo-url> <task>` slash command (`POST /api/slack/command`), and the `app_mention` Events API endpoint (`POST /api/slack/events`) — both verified with HMAC-SHA256 and a 5-minute replay window. The events path acks in under 3 seconds, dedupes on `event_id` so a Slack retry cannot produce two runs, groups message bursts into one run, gathers thread context with secret redaction, and posts an in-thread Block Kit approval card gated by the `SLACK_APPROVERS` allowlist. One thread is one orchestrator conversation.
 
-Not built: the `app_mention` events endpoint, in-thread Block Kit approval cards with an approver allowlist, burst grouping, and thread-context gathering. No P3 live workspace verification is claimed; the P3 acceptance bar in `PLAN.md` §15 (Request URL verification with Access enabled, non-approver clicks refused with no container started, one run per burst, secret redaction) is pending.
+**`SLACK_APPROVERS` unset means nobody can approve from Slack.** That is deliberate: a valid signature authenticates Slack, not the human who clicked, and a Block Kit button in a public channel is clickable by every member.
+
+No P3 live workspace verification is claimed. The P3 acceptance bar in `PLAN.md` §15 (Request URL verification with Access enabled, non-approver clicks refused with no container started, one run per burst, secret redaction) has not been exercised against a real workspace.
 
 ## Automations
 
-Not built. There is no Automations Durable Object, no cron trigger block, no `run_when` gate, and no unattended mode. Scheduled or webhook-driven runs do not exist yet.
+Shipped: schedule (five-field cron, 5-minute floor, missed ticks coalesced), GitHub, Slack, incoming-webhook, and manual triggers, OR'd together at most one run per event. A `runWhen` sentence on any trigger is checked by the cheap Workers AI model before the run starts and **fails closed** — a model error or an unparseable answer means no run, with the reason recorded.
+
+Safety, all three required together: approval by default, opt-in unattended mode refused unless opening a PR is the only mutation *and* the repo is allowlisted, and a daily run budget per automation. Kill switches: `enabled` per automation, `AUTOMATIONS_ENABLED` globally. Not verified live.
 
 ## Agent harnesses
 
-OpenCode only. `buildOpencodeArgv` invokes `opencode run --format json`; there is no Claude Code, Codex, or Aider harness, and provider choice is limited to `google/*` (see Configuration). The computer adapter deliberately refuses execution — `@cloudflare/computer` is preview-only, so Sandbox remains the default.
+Three, selected with `AGENT_HARNESS`: `opencode` (default, `opencode run --format json`), `claude-code` (`claude --print --output-format stream-json`), and `codex` (`codex exec --json`). Aider is not implemented.
+
+Claude Code and Codex are **API-key harnesses only**. Subscription credentials are deliberately not proxied: Anthropic's terms forbid third parties routing requests through Free, Pro, or Max plan credentials on behalf of users.
+
+The credential invariant holds for every harness — the container receives a dummy key and the real one is injected outside it at the egress boundary. `allowedHosts` is narrowed per run to the *selected* harness's provider host plus git, never the union across harnesses. Only OpenCode has been exercised end to end; the Claude Code and Codex event parsers are unit-tested but unproven against a live CLI, and their CLIs are not in the shipped image.
+
+The computer adapter deliberately refuses execution — `@cloudflare/computer` is preview-only, so Sandbox remains the default.
 
 ## What is and is not implemented
 
@@ -165,3 +179,4 @@ Cost surfaces include Workers, Workers AI planning inference, Durable Objects, C
 ## License
 
 MIT. See LICENSE.
+

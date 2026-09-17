@@ -35,9 +35,9 @@ The delegate_coding_task tool accepts:
 
 The tool sets needsApproval: true. Decisions use addToolApprovalResponse({ id, approved }); delegated events use useAgentToolEvents. There are no custom approval WebSocket messages.
 
-## Provider callback
+## Provider traffic
 
-/api/provider/google and its subpaths return **503**, with an explicit disabled-integration error. The binding-based helper is internal and is not connected to this public callback. It accepts only configured Google model POST operations, validates JSON, and uses AI.gateway(GATEWAY_ID).run. Its own rejection statuses are 403 (endpoint), 405 (method), 400 (body), and 502 (gateway error). Those helper tests do not prove a functioning public provider route.
+There is no public `/api/provider` route. The coding model is called from inside the sandbox; Sandbox egress intercepts the provider host and swaps in the AI Gateway credential. Keep keys in the gateway, never in the container.
 
 ## GitHub webhook
 

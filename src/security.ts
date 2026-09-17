@@ -116,6 +116,7 @@ const SECRET_PATTERNS: RegExp[] = [
   /xox[bpas]-[A-Za-z0-9-]{8,}/g,
   /Bearer\s+[A-Za-z0-9._~+/-]{8,}={0,2}/gi,
   /api[_-]?key\s*[:=]\s*['"]?[A-Za-z0-9._~+/-]{8,}['"]?/gi,
+  /AI_GATEWAY_TOKEN\s*[:=]\s*[A-Za-z0-9._~+/-]{8,}/gi,
 ];
 
 /** Replace known secret shapes with [redacted]. Safe to run on any text. */

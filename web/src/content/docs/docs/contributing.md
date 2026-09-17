@@ -11,17 +11,17 @@ Describe a proposed change separately from behavior already implemented.
 
 ## Verify locally
 
-Use the Node and npm versions declared in `package.json`:
-Node 22.12.0 or newer and npm 9.6.5 or newer.
+Use the Node and pnpm versions declared in `package.json`:
+Node 22.12.0 or newer and pnpm 10.0.0 or newer.
 Run these commands from the repository root:
 
 ```sh
-npm ci
-npm run typecheck
-npm run lint
-npm test
-npm run docs:check
-npm run build
+pnpm install
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm docs:check
+pnpm build
 npx wrangler deploy --dry-run
 ```
 
@@ -32,10 +32,10 @@ A dry run is not a deployment. See [Local development](/docs/local-development/)
 
 ## Documentation changes
 
-Edit pages under `docs/src/content/docs/`. Keep `title` and `description`
+Edit pages under `web/src/content/docs/`. Keep `title` and `description`
 frontmatter, descriptive headings, and links using the `/docs/` base.
 Starlight supplies navigation and search; avoid duplicating its interface.
-Source: `docs/astro.config.mjs` and `docs/src/content.config.ts`.
+Source: `web/astro.config.mjs`.
 
 Write technical claims from `src/`, `wrangler.jsonc`, and the installed
 configuration rather than copying README assumptions. Cite relevant source
@@ -57,3 +57,17 @@ Deployment, pushing commits, and opening pull requests are external actions;
 local verification does not authorize them. State what was tested without
 claiming live acceptance from a static build.
 The project declares the MIT license in `package.json` and `LICENSE`.
+
+## Release hygiene
+
+These versions are pinned because they couple to runtime behavior. Bumping any
+of them requires re-running the live acceptance checklist (T10).
+
+| Package | Version | Why it matters |
+|---|---|---|
+| `opencode-ai` | `1.18.31` | `parseOpencodeEvent` couples to the JSON event format. A stream-format change breaks progress parsing silently. |
+| `@cloudflare/sandbox` | `0.12.9` | Must match the base image tag in `Dockerfile`. The `interceptHttps` + `outboundByHost` mechanism is the "no credentials in the container" guarantee. |
+| `CODING_MODEL` | `google/gemini-3.5-flash-lite` | Model ids retire. A retired model fails silently at run time. |
+
+`src/index.ts` throws on first request if `CODING_MODEL` is in the retired-id deny list.
+

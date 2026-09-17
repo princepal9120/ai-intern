@@ -9,11 +9,11 @@ Non-secret defaults live in wrangler.jsonc. Local overrides and secrets may be p
 | --- | --- | --- |
 | GATEWAY_ID | default | Account-owned AI Gateway selected by the AI binding |
 | ORCHESTRATOR_MODEL | @cf/meta/llama-3.1-8b-instruct | Parent planning via Workers AI |
-| CODING_MODEL | google/gemini-2.0-flash | OpenCode model; only google/* accepted |
+| CODING_MODEL | google/gemini-3.5-flash-lite | Coding model; validated against the selected harness |
 | RUNTIME | sandbox | Default adapter; computer refuses execution |
-| WORKER_ORIGIN | unset | Still required by the orchestrator to construct its callback URL |
+| AGENT_HARNESS | opencode | opencode, claude-code, or codex |
 
-**The public provider callback is disabled and returns 503.** Setting WORKER_ORIGIN does not make live coding work. The binding-based helper in src/provider-gateway.ts is not yet connected to Sandbox egress. CF_ACCOUNT_ID and AI_GATEWAY_TOKEN remain legacy optional fields but are not consumed by that helper.
+Provider traffic is intercepted at Sandbox egress. There is no public `/api/provider` callback. Keep provider keys in AI Gateway BYOK; they never enter the container.
 
 Select a currently available model in your account. The checked-in default is not an availability guarantee. The assistant model used to edit this repository is independent of these application settings; an anonymous model name is not a usable endpoint.
 

@@ -1,0 +1,21 @@
+---
+title: Claude Code & OpenCode Harnesses
+description: Running OpenCode (shipped) and Claude Code / Codex (unit-tested, not in the image) inside Sandbox containers.
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+**Current behavior (as implemented):** the Dockerfile installs `opencode-ai@1.18.31` only. `AGENT_HARNESS=claude-code` or `codex` is unit-tested and fails at exec until a matching image exists.
+
+**Specification target (GOAL / PLAN T22):** API-key harnesses only. Subscription credentials are not proxied.
+
+<CardGrid>
+  <Card title="OpenCode (shipped image)" icon="setting">
+    Default. Dummy key in the container; Sandbox egress swaps in the AI Gateway credential for `generativelanguage.googleapis.com`.
+  </Card>
+  <Card title="Claude Code / Codex (not in image)" icon="puzzle">
+    Adapters live in `src/harness/`. Same dummy-key pattern for `api.anthropic.com` and `api.openai.com`. `allowedHosts` is the selected harness plus git, never the union.
+  </Card>
+</CardGrid>
+
+Set `AGENT_HARNESS` as a Worker var. There is no per-task `harness` field on `delegate_coding_task`. `registry.npmjs.org` is not on the egress allowlist, so `npm install` inside a run is refused.

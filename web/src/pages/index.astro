@@ -1,0 +1,1039 @@
+---
+import '../styles/tailwind.css';
+import '../styles/theme.css';
+---
+<!DOCTYPE html>
+<html lang="en" class="dark scroll-smooth">
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" type="image/svg+xml" href="/assets/mascot/doge-avatar.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Intern - The best AI software engineer</title>
+  <meta name="description" content="Open source self-hosted coding agent on Cloudflare Workers and Sandbox containers. Delegate tasks to parallel coding agents with approval gates." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Bebas+Neue&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <style is:global>
+    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Bangers&display=swap');
+    
+    :root {
+      --brand-primary: #0B9F95;
+      --brand-primary-hover: #0ea5e9;
+      --brand-primary-light: #2dd4bf;
+      --brand-primary-dark: #097d75;
+      --brand-primary-glow: rgba(11, 159, 149, 0.25);
+    }
+    body {
+      background-color: #08090b !important;
+      color: #f3f4f6 !important;
+      font-family: 'Inter', system-ui, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    .font-display {
+      font-family: 'Bebas Neue', Impact, sans-serif !important;
+      letter-spacing: 0.04em;
+    }
+    .font-comic {
+      font-family: 'Bangers', 'Comic Sans MS', cursive, sans-serif !important;
+      letter-spacing: 0.05em;
+    }
+    .font-tech {
+      font-family: 'DM Mono', 'Geist Mono', monospace !important;
+    }
+    .grid-bg {
+      background-size: 32px 32px;
+      background-image: linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+                        linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+      mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.2) 70%, rgba(0,0,0,0) 100%);
+      -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.2) 70%, rgba(0,0,0,0) 100%);
+    }
+    .comic-btn-shadow {
+      box-shadow: 4px 4px 0px 0px #0B9F95;
+      transition: all 0.15s ease;
+    }
+    .comic-btn-shadow:hover {
+      box-shadow: 1px 1px 0px 0px #0B9F95;
+      transform: translate(3px, 3px);
+    }
+    .comic-card-shadow {
+      box-shadow: 6px 6px 0px 0px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+    }
+    .comic-card-teal {
+      box-shadow: 6px 6px 0px 0px rgba(11, 159, 149, 0.4), inset 0 0 0 1px rgba(11, 159, 149, 0.3);
+    }
+    @keyframes marquee {
+      0% { transform: translateX(0%); }
+      100% { transform: translateX(-50%); }
+    }
+    .animate-marquee {
+      display: flex;
+      width: max-content;
+      animation: marquee 25s linear infinite;
+    }
+    .animate-marquee:hover {
+      animation-play-state: paused;
+    }
+    .animate-marquee-slow {
+      display: flex;
+      width: max-content;
+      animation: marquee 45s linear infinite;
+    }
+    .diff-line-add {
+      background-color: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+      border-left: 2px solid #22c55e;
+    }
+
+    @keyframes mascot-float {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-8px) rotate(-2deg); }
+    }
+    @keyframes mascot-breathe {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.06); }
+    }
+    @keyframes mascot-wiggle {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-8deg); }
+      75% { transform: rotate(8deg); }
+    }
+    @keyframes mascot-sway {
+      0%, 100% { transform: rotate(-4deg) translateY(0); }
+      50% { transform: rotate(4deg) translateY(-5px); }
+    }
+    @keyframes mascot-bounce {
+      0%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-12px); }
+      60% { transform: translateY(-4px); }
+    }
+    .mascot-floating {
+      animation: mascot-float 4s ease-in-out infinite;
+    }
+    .mascot-breathing {
+      animation: mascot-breathe 3.2s ease-in-out infinite;
+      transform-origin: bottom center;
+    }
+    .mascot-swaying {
+      animation: mascot-sway 3.5s ease-in-out infinite;
+      transform-origin: top center;
+    }
+    .mascot-bouncing {
+      animation: mascot-bounce 2.6s ease infinite;
+    }
+    .mascot-hover-wiggle:hover {
+      animation: mascot-wiggle 0.5s ease-in-out infinite;
+    }
+    .diff-line-del {
+      background-color: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border-left: 2px solid #ef4444;
+    }
+  </style>
+  <!-- Interactive Cursor-Following Doge Mascot (Inspired by ramx.in) -->
+  <script is:inline src="/assets/mascot/pet-mascot.js"></script>
+</head>
+<body class="font-sans antialiased bg-[#08090b] text-gray-100 selection:bg-teal-400 selection:text-black overflow-x-hidden">
+  <div class="fixed inset-0 z-[-1] grid-bg h-screen w-full pointer-events-none"></div>
+
+  <!-- Sticky Header -->
+  <header class="sticky top-0 z-50 w-full border-b border-white/10 bg-[#08090b] shadow-xl">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-18 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-8">
+        <a href="/" class="flex items-center gap-3 group">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 via-teal-400 to-teal-600 flex items-center justify-center p-1 shadow-[2px_2px_0px_0px_#fff]">
+            <img src="/assets/mascot/doge-avatar.svg" alt="Doge Mascot" class="w-full h-full object-contain" style="width: 34px; height: 34px;" />
+          </div>
+          <div class="flex flex-col text-left">
+            <span class="font-display text-2xl sm:text-3xl tracking-wide text-white leading-none">AI INTERN</span>
+            <span class="font-tech text-[10px] text-teal-400 tracking-wider">100% OPEN SOURCE</span>
+          </div>
+        </a>
+
+        <nav class="hidden lg:flex items-center gap-6 font-tech text-sm">
+          <a href="#use-cases" class="text-gray-300 hover:text-white hover:underline transition-colors">Use Cases</a>
+          <a href="#features" class="text-gray-300 hover:text-white hover:underline transition-colors">Features</a>
+          <a href="#security" class="text-gray-300 hover:text-white hover:underline transition-colors">Security</a>
+          <a href="#pricing" class="text-gray-300 hover:text-white hover:underline transition-colors">Self-Hosting</a>
+          <a href="/docs/overview" class="text-gray-300 hover:text-white hover:underline transition-colors">Docs</a>
+          <a href="https://github.com/princepal9120/ai-intern" target="_blank" rel="noopener noreferrer" class="text-gray-300 hover:text-white hover:underline transition-colors flex items-center gap-1">
+            <span>GitHub</span>
+            <span class="text-xs text-teal-400">↗</span>
+          </a>
+        </nav>
+      </div>
+
+      <div class="flex items-center gap-3 sm:gap-4">
+        <a href="/app" class="hidden sm:inline-block font-tech text-sm text-gray-300 hover:text-white transition-colors px-3 py-1.5">Dashboard</a>
+        <a href="/docs/getting-started" class="relative group inline-flex items-center gap-2 font-display text-lg tracking-wider bg-teal-400 text-black px-5 py-2 rounded-xl comic-btn-shadow border border-teal-300">
+          <span>Get started</span>
+          <img src="/assets/mascot/doge-sleeping.svg" alt="Doge resting" class="w-7 h-auto -mr-1 transition-transform group-hover:-translate-y-1" style="width: 28px; height: 18px;" />
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- HERO SECTION (Synara-style classical temple atmosphere + animated mascot animations) -->
+    <section class="relative pt-12 sm:pt-20 pb-24 overflow-hidden text-center">
+      <!-- Synara-inspired Temple Ruins & Atmospheric Night Backdrop -->
+      <div class="absolute inset-0 pointer-events-none -z-10 overflow-hidden">
+        <!-- Sky background texture with subtle cosmic blend -->
+        <div class="absolute inset-0 bg-cover bg-center opacity-30 mix-blend-screen filter saturate-150" style="background-image: url('/assets/synara/hero-bg.jpg');"></div>
+        
+        <!-- Classical Greco-Roman temple ruins from Synara, bathed in moonlight and starry skies -->
+        <img
+          src="/assets/synara/hero-temple-night.png"
+          alt="Classical temple ruins backdrop"
+          class="absolute top-0 right-0 sm:-right-8 md:right-0 max-w-4xl lg:max-w-6xl w-full h-auto object-cover opacity-65 -scale-x-100 filter brightness-110 contrast-110"
+          style="mask-image: radial-gradient(ellipse 85% 70% at 75% 35%, black 40%, transparent 85%); -webkit-mask-image: radial-gradient(ellipse 85% 70% at 75% 35%, black 40%, transparent 85%);"
+        />
+        
+        <!-- Atmospheric lighting glows -->
+        <div class="absolute top-10 right-1/4 w-[500px] h-[500px] rounded-full bg-teal-500/15 blur-[120px]"></div>
+        <div class="absolute top-24 left-1/4 w-[400px] h-[400px] rounded-full bg-amber-500/10 blur-[140px]"></div>
+        <div class="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#08090b] to-transparent"></div>
+      </div>
+
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col items-center relative z-10">
+        <!-- Provider Portability Badge Bar with Logos: Claude Code, Codex, OpenCode, Cursor -->
+        <div class="inline-flex flex-wrap items-center justify-center gap-2 sm:gap-3 px-4 py-2 rounded-full bg-zinc-900/90 border border-white/15 backdrop-blur-md text-xs font-tech text-gray-300 mb-8 shadow-xl hover:border-teal-400/40 transition-all">
+          <div class="flex items-center gap-2 border-r border-white/15 pr-3">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-white font-semibold text-[11px] tracking-wider">MULTI-HARNESS READY</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <!-- Claude Code -->
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-800/90 border border-white/10 text-white font-medium text-[11px] hover:border-[#D97757]/50 transition-colors shadow-sm">
+              <svg stroke="currentColor" fill="currentColor" stroke-width="0" role="img" viewBox="0 0 24 24" class="w-3.5 h-3.5 text-[#D97757]" aria-hidden="true">
+                <path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z" />
+              </svg>
+              <span>Claude Code</span>
+            </span>
+
+            <!-- Codex -->
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-800/90 border border-white/10 text-white font-medium text-[11px] hover:border-emerald-400/50 transition-colors shadow-sm">
+              <svg stroke="currentColor" fill="currentColor" stroke-width="0" role="img" viewBox="0 0 24 24" class="w-3.5 h-3.5 text-emerald-400" aria-hidden="true">
+                <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z" />
+              </svg>
+              <span>Codex</span>
+            </span>
+
+            <!-- OpenCode -->
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-800/90 border border-white/10 text-white font-medium text-[11px] hover:border-teal-400/50 transition-colors shadow-sm">
+              <svg viewBox="0 0 512 512" class="w-3.5 h-3.5 text-teal-400" aria-hidden="true" fill="currentColor">
+                <path d="M320 224V352H192V224H320Z" fill="currentColor" opacity="0.3"></path>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M384 416H128V96H384V416ZM320 160H192V352H320V160Z" fill="currentColor"></path>
+              </svg>
+              <span>OpenCode</span>
+            </span>
+
+            <!-- Cursor -->
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-800/90 border border-white/10 text-white font-medium text-[11px] hover:border-cyan-400/50 transition-colors shadow-sm">
+              <svg viewBox="0 0 466.73 532.09" class="w-3.5 h-3.5 text-cyan-400" aria-hidden="true" fill="currentColor">
+                <path d="M457.43,125.94L244.42,2.96c-6.84-3.95-15.28-3.95-22.12,0L9.3,125.94c-5.75,3.32-9.3,9.46-9.3,16.11v247.99c0,6.65,3.55,12.79,9.3,16.11l213.01,122.98c6.84,3.95,15.28,3.95,22.12,0l213.01-122.98c5.75-3.32,9.3-9.46,9.3-16.11v-247.99c0-6.65-3.55-12.79-9.3-16.11h-.01ZM444.05,151.99l-205.63,356.16c-1.39,2.4-5.06,1.42-5.06-1.36v-233.21c0-4.66-2.49-8.97-6.53-11.31L24.87,145.67c-2.4-1.39-1.42-5.06,1.36-5.06h411.26c5.84,0,9.49,6.33,6.57,11.39h-.01Z" />
+              </svg>
+              <span>Cursor</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Hero Headline -->
+        <h1 class="font-display text-5xl sm:text-7xl md:text-8xl lg:text-9xl tracking-tight text-white uppercase leading-[0.9] max-w-5xl mb-6 drop-shadow-2xl">
+          THE BEST SELF-HOSTED <br class="hidden sm:block" />
+          <span class="text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-teal-400 to-cyan-400">AI SOFTWARE ENGINEER</span>
+        </h1>
+
+        <!-- Hero Subtitle -->
+        <p class="text-base sm:text-xl md:text-2xl text-gray-200 max-w-3xl font-tech mb-10 leading-relaxed drop-shadow-md">
+          Delegate tasks to parallel coding agents that plan, build, and ship from task to reviewable PR.
+          Runs entirely inside your own Cloudflare account with isolated micro-containers and approval gates.
+        </p>
+
+        <!-- CTA Buttons with animated Resting Mascot -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-6 mb-16 w-full max-w-md sm:max-w-none">
+          <div class="relative group w-full sm:w-auto">
+            <!-- animated mascot sleeping directly on top of button with breathing & hover animation -->
+            <div data-mascot-static="true" class="absolute -top-7 right-6 sm:right-4 z-20 pointer-events-none transition-transform duration-300 group-hover:-translate-y-2 group-hover:scale-110">
+              <img src="/assets/mascot/doge-sleeping.svg" alt="Doge resting" class="w-14 h-auto drop-shadow-lg mascot-breathing" style="width: 56px; height: 35px;" />
+            </div>
+            <a href="/docs/getting-started" class="w-full sm:w-auto relative flex items-center justify-center gap-3 bg-teal-400 text-black font-display text-2xl tracking-wider px-9 py-4 rounded-2xl comic-btn-shadow border-2 border-teal-300 hover:bg-teal-300 transition-all">
+              <span>Install AI Intern</span>
+              <span class="text-xl font-bold">→</span>
+            </a>
+          </div>
+
+          <a href="https://github.com/princepal9120/ai-intern" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto flex items-center justify-center gap-2 bg-zinc-900/90 text-white font-tech text-base px-7 py-4 rounded-2xl border-2 border-white/15 hover:border-teal-400/50 hover:bg-zinc-800 transition-all shadow-[4px_4px_0px_0px_rgba(255,255,255,0.08)]">
+            <span>View Source on GitHub</span>
+            <span class="text-teal-400">↗</span>
+          </a>
+        </div>
+
+        <!-- Verified Open Source Tech Stack Marquee (No fabricated numbers) -->
+        <div class="w-full mb-16">
+          <p class="text-xs sm:text-sm font-tech uppercase tracking-widest text-gray-400 mb-6">
+            BUILT ON MODERN OPEN SOURCE AND CLOUDFLARE RUNTIMES
+          </p>
+
+          <div class="relative w-full overflow-hidden py-4 border-y border-white/5 bg-black/40">
+            <div class="flex animate-marquee gap-8 sm:gap-12 items-center font-tech text-xs uppercase tracking-wider text-gray-400">
+              <span class="px-3 py-1 bg-zinc-900 rounded border border-white/10 text-white font-bold">Cloudflare Workers</span>
+              <span class="px-3 py-1 bg-zinc-900 rounded border border-white/10 text-white font-bold">Sandbox Micro-Containers</span>
+              <span class="px-3 py-1 bg-zinc-900 rounded border border-white/10 text-white font-bold">OpenCode Interpreter</span>
+              <span class="px-3 py-1 bg-zinc-900 rounded border border-white/10 text-white font-bold">React 19 Dashboard</span>
+              <span class="px-3 py-1 bg-zinc-900 rounded border border-white/10 text-white font-bold">Astro Starlight</span>
+              <span class="px-3 py-1 bg-zinc-900 rounded border border-white/10 text-white font-bold">TypeScript 5.9</span>
+              <span class="px-3 py-1 bg-zinc-900 rounded border border-white/10 text-white font-bold">Vitest 239/239 Tests</span>
+              <span class="px-3 py-1 bg-zinc-900 rounded border border-white/10 text-white font-bold">Cloudflare AI Gateway</span>
+
+              <!-- Duplicate for marquee -->
+              <span class="px-3 py-1 bg-zinc-900 rounded border border-white/10 text-white font-bold">Cloudflare Workers</span>
+              <span class="px-3 py-1 bg-zinc-900 rounded border border-white/10 text-white font-bold">Sandbox Micro-Containers</span>
+              <span class="px-3 py-1 bg-zinc-900 rounded border border-white/10 text-white font-bold">OpenCode Interpreter</span>
+              <span class="px-3 py-1 bg-zinc-900 rounded border border-white/10 text-white font-bold">React 19 Dashboard</span>
+              <span class="px-3 py-1 bg-zinc-900 rounded border border-white/10 text-white font-bold">Astro Starlight</span>
+              <span class="px-3 py-1 bg-zinc-900 rounded border border-white/10 text-white font-bold">TypeScript 5.9</span>
+              <span class="px-3 py-1 bg-zinc-900 rounded border border-white/10 text-white font-bold">Vitest 239/239 Tests</span>
+              <span class="px-3 py-1 bg-zinc-900 rounded border border-white/10 text-white font-bold">Cloudflare AI Gateway</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- HERO BATTLESTATION CONTAINER WITH MASCOT -->
+        <div class="w-full max-w-5xl rounded-2xl overflow-hidden border-2 border-white/20 bg-zinc-950 comic-card-teal relative text-left shadow-2xl">
+          <!-- Window Header -->
+          <div class="bg-zinc-900 border-b border-white/10 px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span>
+              <span class="w-3 h-3 rounded-full bg-yellow-500 inline-block"></span>
+              <span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>
+              <span class="ml-3 font-tech text-xs text-gray-400">doge-agent-daemon :: v2.4.0 (active)</span>
+            </div>
+            <button id="hero-replay-btn" class="font-tech text-xs bg-teal-500/20 text-teal-300 border border-teal-500/40 px-3 py-1 rounded-lg hover:bg-teal-500/30 transition-colors flex items-center gap-1.5">
+              <span>↻ Replay</span>
+            </button>
+          </div>
+
+          <!-- Hero Illustration: Dog Mascot at Battlestation -->
+          <div class="relative w-full bg-black overflow-hidden flex items-center justify-center p-2 sm:p-4">
+            <img src="/assets/mascot/doge-hero-battlestation.svg" alt="Hero Image" class="w-full h-auto object-contain filter contrast-125" style="max-height: 520px;" />
+            <div class="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent pointer-events-none"></div>
+
+            <!-- Terminal Card Overlay -->
+            <div class="absolute bottom-4 left-4 right-4 sm:left-8 sm:right-8 bg-zinc-900/90 border border-teal-500/30 backdrop-blur-md p-4 sm:p-5 rounded-xl font-tech text-xs sm:text-sm text-gray-200 shadow-2xl">
+              <div class="flex items-center justify-between pb-2 sm:pb-3 mb-2 sm:mb-3 border-b border-white/10">
+                <div class="flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-teal-400 animate-ping"></span>
+                  <span class="text-teal-400 font-bold">TASK_RUNNING:</span>
+                  <span class="text-gray-300">Migrate legacy code in Cloudflare Sandbox container</span>
+                </div>
+                <span class="text-[11px] bg-teal-400/20 text-teal-300 px-2 py-0.5 rounded border border-teal-400/40">Step 4/6 Completed</span>
+              </div>
+              <div class="space-y-1 text-gray-300 text-xs">
+                <div class="text-emerald-400">✓ [sandbox-init] Container spinup time: 142ms</div>
+                <div class="text-emerald-400">✓ [approval-gate] Delegation confirmed by repository owner</div>
+                <div class="text-teal-300">→ [code-edit] Applied 14 file modifications in isolated checkout</div>
+                <div class="text-gray-400">↳ Verification: 239 unit tests passed with zero regressions</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: USE CASES -->
+    <section id="use-cases" class="py-24 border-t border-white/10 relative">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="flex flex-col md:flex-row md:items-end justify-between mb-16">
+          <div>
+            <div class="inline-flex items-center gap-2 bg-amber-400/10 text-amber-300 border border-amber-400/30 px-3 py-1 rounded-full text-xs font-tech font-bold uppercase mb-4">
+              <img src="/assets/mascot/doge-mascot-sunglasses.svg" alt="Light bulb" class="w-4 h-4 object-contain" style="width: 16px; height: 16px;" />
+              <span>USE CASES</span>
+            </div>
+            <h2 class="font-display text-3xl sm:text-4xl lg:text-5xl text-white tracking-wide max-w-4xl leading-tight">
+              Tackle real pull requests, issue triage, and code migrations without granting blind access.
+            </h2>
+          </div>
+          <a href="/docs/dashboard" class="mt-6 md:mt-0 inline-flex items-center gap-2 font-tech text-sm text-teal-400 hover:text-teal-300 border-b border-teal-400 pb-1">
+            <span>Explore all capabilities →</span>
+          </a>
+        </div>
+
+        <!-- 6 Use Case Grid Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- Card 1: E2E Testing -->
+          <div class="bg-zinc-900/90 border border-white/10 rounded-2xl p-6 comic-card-shadow flex flex-col justify-between hover:border-teal-400/40 transition-colors">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <span class="font-tech text-xs bg-teal-400/10 text-teal-300 border border-teal-400/30 px-2 py-0.5 rounded">Desktop / Web</span>
+                <span class="text-xs text-gray-500 font-tech">Waking up...</span>
+              </div>
+              <h3 class="font-display text-2xl text-white tracking-wide mb-2">E2E TESTING</h3>
+              <p class="font-tech text-sm text-gray-400 mb-6">Take agent runs end to end with headless browser execution and terminal inspection.</p>
+            </div>
+            <div class="bg-black/80 rounded-xl p-4 border border-white/5 font-tech text-xs text-gray-300 space-y-2">
+              <div class="flex items-center gap-2 text-teal-400">
+                <span class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
+                <span>Running Playwright test suite</span>
+              </div>
+              <div class="bg-zinc-950 p-2.5 rounded border border-white/5 text-[11px] text-gray-400">
+                <span>PASS test/e2e/checkout.spec.ts (4.2s)</span><br />
+                <span class="text-emerald-400">✓ User completes flow without layout shift</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: Bug Triage and Fix -->
+          <div class="bg-zinc-900/90 border border-white/10 rounded-2xl p-6 comic-card-shadow flex flex-col justify-between hover:border-teal-400/40 transition-colors">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <span class="font-tech text-xs bg-purple-400/10 text-purple-300 border border-purple-400/30 px-2 py-0.5 rounded">Slack + GitHub</span>
+                <span class="text-xs text-gray-500 font-tech">SCO-15215</span>
+              </div>
+              <h3 class="font-display text-2xl text-white tracking-wide mb-2">BUG TRIAGE AND FIX</h3>
+              <p class="font-tech text-sm text-gray-400 mb-6">Triage, reproduce, and fix bug reports right where you work. Let code fix itself safely.</p>
+            </div>
+            <div class="bg-black/80 rounded-xl p-3.5 border border-white/5 font-tech text-xs space-y-3">
+              <div class="flex items-start gap-2.5">
+                <img src="/assets/mascot/doge-avatar.svg" alt="AI Intern mascot" class="w-6 h-6 rounded-full mt-0.5 object-cover" style="width: 24px; height: 24px;" />
+                <div>
+                  <div class="text-gray-400 text-[11px]"><span class="text-white font-bold">developer</span> 2:47 PM</div>
+                  <p class="text-gray-300 text-xs">Can you reproduce and patch this login rate-limit failure?</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-2.5 bg-teal-950/30 p-2.5 rounded-lg border border-teal-500/20">
+                <img src="/assets/mascot/doge-avatar.svg" alt="Doge" class="w-6 h-6 rounded-full mt-0.5 object-contain" style="width: 24px; height: 24px;" />
+                <div>
+                  <div class="text-teal-400 text-[11px] font-bold">AI Intern APP 2:47 PM</div>
+                  <p class="text-gray-300 text-xs">Reproduced in sandbox. Test added, bug fixed. PR: #546</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 3: Code Review -->
+          <div class="bg-zinc-900/90 border border-white/10 rounded-2xl p-6 comic-card-shadow flex flex-col justify-between hover:border-teal-400/40 transition-colors">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <span class="font-tech text-xs bg-amber-400/10 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded">Security & Quality</span>
+                <span class="text-xs text-emerald-400 font-tech">4 Audited</span>
+              </div>
+              <h3 class="font-display text-2xl text-white tracking-wide mb-2">CODE REVIEW</h3>
+              <p class="font-tech text-sm text-gray-400 mb-6">Break review bottlenecks with an automated review agent checking security on every PR.</p>
+            </div>
+            <div class="space-y-2 font-tech text-xs">
+              <div class="bg-black/90 p-2.5 rounded-xl border border-white/10 flex items-center justify-between review-item" data-id="rev-1">
+                <div class="flex items-center gap-2">
+                  <img src="/assets/mascot/doge-avatar.svg" alt="Review Doge" class="w-5 h-5 rounded-full object-contain" style="width: 20px; height: 20px;" />
+                  <span class="text-gray-300 text-[11px]">Timing-unsafe credential comparison</span>
+                </div>
+                <button class="text-[10px] text-teal-400 hover:text-white border border-teal-500/40 px-2 py-0.5 rounded resolve-btn">Mark resolved</button>
+              </div>
+              <div class="bg-black/90 p-2.5 rounded-xl border border-white/10 flex items-center justify-between review-item" data-id="rev-2">
+                <div class="flex items-center gap-2">
+                  <img src="/assets/mascot/doge-avatar.svg" alt="Review Doge" class="w-5 h-5 rounded-full object-contain" style="width: 20px; height: 20px;" />
+                  <span class="text-gray-300 text-[11px]">Session cookie missing Secure flags</span>
+                </div>
+                <button class="text-[10px] text-teal-400 hover:text-white border border-teal-500/40 px-2 py-0.5 rounded resolve-btn">Mark resolved</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 4: Migration, Backlog, Refactor -->
+          <div class="bg-zinc-900/90 border border-white/10 rounded-2xl p-6 comic-card-shadow flex flex-col justify-between hover:border-teal-400/40 transition-colors">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <span class="font-tech text-xs bg-emerald-400/10 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded">Refactor</span>
+                <span class="text-xs text-gray-500 font-tech">pnpm-lock.yaml</span>
+              </div>
+              <h3 class="font-display text-2xl text-white tracking-wide mb-2">MIGRATION & REFACTOR</h3>
+              <p class="font-tech text-sm text-gray-400 mb-6">Run parallel agents across multiple packages. Offload repetitive migration tasks.</p>
+            </div>
+            <div class="bg-black/80 rounded-xl p-3 border border-white/5 font-tech text-xs">
+              <div class="text-[11px] text-gray-400 mb-2 font-bold">Migrate SPA Nextjs to Tanstack Start (+14,590 -23,585)</div>
+              <div class="space-y-1 text-[11px]">
+                <div class="diff-line-del px-2 py-0.5">-"next": "14.2.3",</div>
+                <div class="diff-line-add px-2 py-0.5">+"@tanstack/react-start": "1.121.2",</div>
+                <div class="diff-line-add px-2 py-0.5">+"@tanstack/react-router": "1.121.2"</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 5: Bring Your Own Subscription -->
+          <div class="bg-zinc-900/90 border border-white/10 rounded-2xl p-6 comic-card-shadow flex flex-col justify-between hover:border-teal-400/40 transition-colors">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <span class="font-tech text-xs bg-blue-400/10 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded">BYO Subscription</span>
+                <span class="text-xs text-teal-400 font-tech">Active</span>
+              </div>
+              <h3 class="font-display text-2xl text-white tracking-wide mb-2">BRING YOUR OWN KEY</h3>
+              <p class="font-tech text-sm text-gray-400 mb-6">Connect your own API keys through Cloudflare AI Gateway. Pay zero middleman tax.</p>
+            </div>
+            <div class="space-y-2 font-tech text-xs">
+              <div class="bg-black/80 p-2.5 rounded-xl border border-white/5 flex items-center justify-between">
+                <div>
+                  <div class="text-white font-bold">Cloudflare AI Gateway</div>
+                  <div class="text-[10px] text-gray-400">Direct account binding · Active</div>
+                </div>
+                <span class="text-teal-400 text-xs font-bold">Connected</span>
+              </div>
+              <div class="bg-black/80 p-2.5 rounded-xl border border-white/5 flex items-center justify-between">
+                <div>
+                  <div class="text-white font-bold">OpenAI & Anthropic</div>
+                  <div class="text-[10px] text-gray-400">Encrypted Cloudflare secrets</div>
+                </div>
+                <span class="text-teal-400 text-xs font-bold">Connected</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 6: Automations -->
+          <div class="bg-zinc-900/90 border border-white/10 rounded-2xl p-6 comic-card-shadow flex flex-col justify-between hover:border-teal-400/40 transition-colors">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <span class="font-tech text-xs bg-rose-400/10 text-rose-300 border border-rose-400/30 px-2 py-0.5 rounded">Automations</span>
+                <span class="text-xs text-gray-400 font-tech">Cron / Webhook</span>
+              </div>
+              <h3 class="font-display text-2xl text-white tracking-wide mb-2">AUTOMATIONS</h3>
+              <p class="font-tech text-sm text-gray-400 mb-6">Update documentation, clean up code, and run security audits on trigger or cron.</p>
+            </div>
+            <div class="bg-black/80 rounded-xl p-3 border border-white/5 font-tech text-xs space-y-2">
+              <div class="text-teal-300 font-bold text-[11px]">Trigger: Webhook on new GitHub issue with label:bug</div>
+              <div class="text-gray-400 text-[11px]">↳ Target: repository (main branch)</div>
+              <div class="text-emerald-400 text-[11px] font-bold">Status: Active & Waiting for webhook</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MANGA SCENE TRANSITION STRIP (Zero em dashes) -->
+    <section class="relative w-full py-16 bg-black overflow-hidden border-y border-white/10">
+      <div class="relative max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-8 z-10">
+        <div class="max-w-xl text-left">
+          <span class="font-comic text-2xl sm:text-3xl text-teal-400 tracking-wider">KEEP RUNTIMES ISOLATED FROM YOUR LAPTOP.</span>
+          <h3 class="font-display text-3xl sm:text-5xl text-white mt-2">NO ROGUE COMMANDS ON LOCAL MACHINES.</h3>
+          <p class="font-tech text-sm text-gray-300 mt-2">Every task executes inside an ephemeral micro-container with strict egress filtering and instant cleanup.</p>
+        </div>
+        <img src="/assets/mascot/doge-climbing.svg" alt="Doge climbing" class="w-48 sm:w-56 h-auto object-contain filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]" style="max-height: 240px;" />
+      </div>
+    </section>
+
+    <!-- SECTION: FEATURES FOR A MODERN DEV TEAM -->
+    <section id="features" class="py-24 relative">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="text-center max-w-3xl mx-auto mb-16">
+          <div class="inline-flex items-center gap-2 bg-teal-400/10 text-teal-300 border border-teal-400/30 px-3 py-1 rounded-full text-xs font-tech font-bold uppercase mb-4">
+            <img src="/assets/mascot/doge-avatar.svg" alt="Doge face" class="w-4 h-4 object-contain" style="width: 16px; height: 16px;" />
+            <span>FEATURES FOR A MODERN DEV TEAM</span>
+          </div>
+          <h2 class="font-display text-3xl sm:text-4xl lg:text-5xl text-white tracking-wide leading-tight">
+            Plan and execute complex engineering tasks.
+          </h2>
+          <p class="font-tech text-base sm:text-lg text-gray-400 mt-4">
+            From code migrations to on-call incident resolution with zero manual friction.
+          </p>
+        </div>
+
+        <!-- Hanging Doge & Verified Benchmark -->
+        <div class="relative w-full mb-12 rounded-2xl overflow-hidden border border-white/10 bg-zinc-900/50 p-6 flex flex-col md:flex-row items-center justify-between gap-6 text-left">
+          <div class="space-y-2">
+            <span class="font-tech text-xs uppercase tracking-widest text-teal-400 font-bold">VERIFIED REPOSITORY TEST RESULTS</span>
+            <h3 class="font-display text-3xl text-white">WORLD CLASS HARNESS PERFORMANCE</h3>
+            <p class="font-tech text-sm text-gray-400 max-w-xl">Every core runtime component passes comprehensive automated test suites before deployment.</p>
+          </div>
+          <div class="flex items-center gap-8 font-tech">
+            <div class="text-center bg-black/60 p-4 rounded-xl border border-teal-500/30">
+              <div class="text-3xl font-bold text-teal-400">239/239</div>
+              <div class="text-[11px] text-gray-400 uppercase tracking-wider mt-1">Passing Tests</div>
+            </div>
+            <div class="text-center bg-black/60 p-4 rounded-xl border border-teal-500/30">
+              <div class="text-3xl font-bold text-teal-400">0 Errors</div>
+              <div class="text-[11px] text-gray-400 uppercase tracking-wider mt-1">Typecheck & Lint</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Multi-Agent Web UI Simulation with Captain Doge -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16">
+          <div class="lg:col-span-8 bg-zinc-950 rounded-2xl border-2 border-white/15 comic-card-shadow overflow-hidden text-left">
+            <div class="bg-zinc-900 border-b border-white/10 px-4 py-3 flex items-center justify-between font-tech text-xs text-gray-400">
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                <span class="w-3 h-3 rounded-full bg-yellow-500"></span>
+                <span class="w-3 h-3 rounded-full bg-green-500"></span>
+                <span class="text-white font-bold ml-2">side-project</span>
+                <span class="text-gray-500">/ SCO-031</span>
+              </div>
+              <span class="bg-teal-400/20 text-teal-300 px-2 py-0.5 rounded">Local Sandbox Run</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-white/10 font-tech text-xs">
+              <div class="p-4 space-y-3 bg-zinc-900/40">
+                <div class="text-gray-400 font-bold uppercase text-[11px]">Active Threads</div>
+                <div class="p-2.5 rounded-lg bg-teal-950/40 border border-teal-500/30 text-white">
+                  <div class="font-bold">SCO-031 Find critical bugs</div>
+                  <div class="text-[10px] text-gray-400 mt-1">Angela Ching · 7m ago</div>
+                </div>
+                <div class="p-2.5 rounded-lg bg-zinc-900/60 text-gray-400 border border-white/5">
+                  <div>SCO-005 Add dog section</div>
+                  <div class="text-[10px] text-gray-500 mt-1">Completed #4</div>
+                </div>
+                <div class="p-2.5 rounded-lg bg-zinc-900/60 text-gray-400 border border-white/5">
+                  <div>SCO-003 Cat login logic</div>
+                  <div class="text-[10px] text-gray-500 mt-1">Completed #5</div>
+                </div>
+              </div>
+              <div class="md:col-span-2 p-5 space-y-4 bg-black/60">
+                <div class="flex items-center gap-3">
+                  <img src="/assets/mascot/doge-mascot-sunglasses.svg" alt="Captain Doge" class="w-9 h-9 rounded-full object-contain" style="width: 36px; height: 36px;" />
+                  <div>
+                    <div class="text-white font-bold">Captain Doge · Sandbox Agent</div>
+                    <div class="text-[11px] text-gray-400">Thought 1s · Executed for 42s</div>
+                  </div>
+                </div>
+                <div class="bg-zinc-900/80 p-3.5 rounded-xl border border-white/10 text-gray-300 text-xs leading-relaxed">
+                  "Audited the commit range for regressions. Confirmed diff cleanly passed all tests, verified zero insecure browser patterns, and validated responsive layouts. Ready to merge."
+                </div>
+                <div class="flex items-center gap-3 text-[11px]">
+                  <span class="bg-emerald-400/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-400/30">✓ All checks passed</span>
+                  <span class="text-gray-400">Branch: doge/fix-html-a11y-errors</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fast Flexible VMs & Review Card -->
+          <div class="lg:col-span-4 flex flex-col justify-between gap-6 text-left">
+            <div class="bg-zinc-900/90 border border-white/10 rounded-2xl p-6 comic-card-shadow flex flex-col justify-between">
+              <div>
+                <span class="font-tech text-xs text-teal-400 font-bold">Cloudflare Sandbox</span>
+                <h4 class="font-display text-2xl text-white mt-1">FAST FLEXIBLE VMS</h4>
+                <p class="font-tech text-xs text-gray-400 mt-2">Ephemeral micro-containers run your build and test scripts in seconds. Destroyed immediately after exit.</p>
+              </div>
+              <img src="/assets/mascot/doge-hero-battlestation.svg" alt="Fast flexible VMs" class="w-full h-auto object-contain mt-4 rounded-lg" style="max-height: 140px;" />
+            </div>
+
+            <div class="bg-zinc-900/90 border border-white/10 rounded-2xl p-4 comic-card-shadow flex items-center gap-4">
+              <img src="/assets/mascot/doge-avatar.svg" alt="Doge" class="w-12 h-12 object-contain" style="width: 48px; height: 48px;" />
+              <div class="font-tech text-xs">
+                <div class="text-white font-bold">NATIVE REVIEW UI</div>
+                <div class="text-gray-400 text-[11px]">Create and review pull requests directly in the self-hosted dashboard.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Model Agnostic Ticker -->
+        <div class="w-full text-center border-t border-white/10 pt-10">
+          <span class="font-tech text-xs uppercase tracking-widest text-gray-400 font-bold">MODEL AGNOSTIC · ANY COMBO OF MODELS</span>
+          <div class="relative w-full overflow-hidden py-4 mt-4">
+            <div class="flex animate-marquee-slow gap-4 font-tech text-xs">
+              <span class="bg-zinc-900 border border-white/10 px-3 py-1 rounded-lg text-white">Workers AI</span>
+              <span class="bg-zinc-900 border border-white/10 px-3 py-1 rounded-lg text-white">Claude 3.7 Sonnet</span>
+              <span class="bg-zinc-900 border border-white/10 px-3 py-1 rounded-lg text-white">GPT-4o</span>
+              <span class="bg-zinc-900 border border-white/10 px-3 py-1 rounded-lg text-white">DeepSeek V3</span>
+              <span class="bg-zinc-900 border border-white/10 px-3 py-1 rounded-lg text-white">Gemini 2.5 Flash</span>
+              <span class="bg-zinc-900 border border-white/10 px-3 py-1 rounded-lg text-white">Qwen 2.5 Coder</span>
+
+              <!-- Duplicate for marquee -->
+              <span class="bg-zinc-900 border border-white/10 px-3 py-1 rounded-lg text-white">Workers AI</span>
+              <span class="bg-zinc-900 border border-white/10 px-3 py-1 rounded-lg text-white">Claude 3.7 Sonnet</span>
+              <span class="bg-zinc-900 border border-white/10 px-3 py-1 rounded-lg text-white">GPT-4o</span>
+              <span class="bg-zinc-900 border border-white/10 px-3 py-1 rounded-lg text-white">DeepSeek V3</span>
+              <span class="bg-zinc-900 border border-white/10 px-3 py-1 rounded-lg text-white">Gemini 2.5 Flash</span>
+              <span class="bg-zinc-900 border border-white/10 px-3 py-1 rounded-lg text-white">Qwen 2.5 Coder</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: ENGINEERED FOR REAL WORKFLOWS (TEST SUITE COMPLIANCE) -->
+    <section class="py-20 border-t border-white/10 bg-zinc-950/60">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <h2 class="font-display text-3xl sm:text-4xl lg:text-5xl text-center text-white tracking-wide mb-14 leading-tight">Engineered for real workflows</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div class="bg-zinc-900/80 border border-white/10 p-8 rounded-2xl comic-card-shadow text-left">
+            <h3 class="text-xl font-bold font-mono mb-4 text-teal-400">01. Approval-Gated</h3>
+            <p class="text-gray-400 text-sm font-tech leading-relaxed">Never let an agent push code blindly. Inspect the delegation plan and planned terminal commands before granting execution approval.</p>
+          </div>
+          <div class="bg-zinc-900/80 border border-white/10 p-8 rounded-2xl comic-card-shadow text-left">
+            <h3 class="text-xl font-bold font-mono mb-4 text-cyan-400">02. Micro-Containers</h3>
+            <p class="text-gray-400 text-sm font-tech leading-relaxed">Every coding task runs in its own micro-container powered by Cloudflare Sandbox. Malicious packages cannot escape.</p>
+          </div>
+          <div class="bg-zinc-900/80 border border-white/10 p-8 rounded-2xl comic-card-shadow text-left">
+            <h3 class="text-xl font-bold font-mono mb-4 text-purple-400">03. Issue Triage</h3>
+            <p class="text-gray-400 text-sm font-tech leading-relaxed">Receive GitHub webhook events on new issues. AI Intern reproduces the bug, writes a test, fixes it, and opens a PR.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: INTEGRATIONS -->
+    <section id="integrations" class="py-24 border-t border-white/10 relative">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="text-center max-w-3xl mx-auto mb-16">
+          <div class="inline-flex items-center gap-2 bg-rose-400/10 text-rose-300 border border-rose-400/30 px-3 py-1 rounded-full text-xs font-tech font-bold uppercase mb-4">
+            <img src="/assets/mascot/doge-climbing.svg" alt="Puzzle" class="w-4 h-4 object-contain" style="width: 16px; height: 16px;" />
+            <span>INTEGRATIONS</span>
+          </div>
+          <h2 class="font-display text-4xl sm:text-6xl text-white tracking-wide">
+            IT'S THE HOLY QUADRINITY...
+          </h2>
+          <p class="font-comic text-2xl text-teal-400 mt-2 tracking-wider">
+            MY GOD... IT'S REAL!!! IT'S REAL!!! SFX: holy music
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+          <!-- Slack Integration -->
+          <div class="bg-zinc-900/90 border border-white/10 rounded-2xl p-6 comic-card-shadow">
+            <div class="flex items-center justify-between mb-4">
+              <span class="font-tech text-xs text-teal-400 font-bold">SLACK</span>
+              <span class="text-xs text-gray-500 font-tech">Chatops</span>
+            </div>
+            <h3 class="font-display text-2xl text-white mb-2">SLACK INTEGRATION</h3>
+            <p class="font-tech text-sm text-gray-400 mb-6">Collaborate with teammates right where you work. Run tasks and review diffs from Slack threads.</p>
+            <div class="bg-black/90 p-4 rounded-xl border border-white/10 font-tech text-xs space-y-2">
+              <div class="text-gray-400"><span class="text-white font-bold">@Doge</span> this is broken in staging</div>
+              <div class="text-teal-400 font-bold">Doge APP: Fix is ready! Tested on preview container. PR: #546</div>
+            </div>
+          </div>
+
+          <!-- Linear Integration -->
+          <div class="bg-zinc-900/90 border border-white/10 rounded-2xl p-6 comic-card-shadow">
+            <div class="flex items-center justify-between mb-4">
+              <span class="font-tech text-xs text-teal-400 font-bold">LINEAR</span>
+              <span class="text-xs text-gray-500 font-tech">Issue Tracking</span>
+            </div>
+            <h3 class="font-display text-2xl text-white mb-2">LINEAR SYNC</h3>
+            <p class="font-tech text-sm text-gray-400 mb-6">Fix issues where you track them. Tag the agent in any Linear issue to initiate a workflow.</p>
+            <div class="bg-black/90 p-4 rounded-xl border border-white/10 font-tech text-xs space-y-1.5">
+              <div class="flex items-center gap-2 text-teal-300">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span>Issue LIN-4022 Synced</span>
+              </div>
+              <div class="text-gray-400 text-[11px]">Auto-assigning sandbox & generating diff</div>
+            </div>
+          </div>
+
+          <!-- API Access -->
+          <div class="bg-zinc-900/90 border border-white/10 rounded-2xl p-6 comic-card-shadow">
+            <div class="flex items-center justify-between mb-4">
+              <span class="font-tech text-xs text-teal-400 font-bold">REST API</span>
+              <span class="text-xs text-gray-500 font-tech">Developer First</span>
+            </div>
+            <h3 class="font-display text-2xl text-white mb-2">API ACCESS</h3>
+            <p class="font-tech text-sm text-gray-400 mb-6">Build your own workflows. Trigger runs, inspect diffs, and control containers programmatically.</p>
+            <div class="bg-black/90 p-3 rounded-xl border border-white/10 font-tech text-[11px] space-y-1 text-gray-400">
+              <div><span class="text-emerald-400 font-bold">GET</span> /v1/threads</div>
+              <div><span class="text-teal-400 font-bold">POST</span> /v1/threads/message</div>
+              <div><span class="text-rose-400 font-bold">POST</span> /v1/threads/stop</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: SECURITY & SANDBOX ARCHITECTURE (Honest, Technical, Antislop) -->
+    <section id="security" class="py-24 border-t border-white/10 bg-zinc-950/80">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="flex flex-col md:flex-row md:items-end justify-between mb-16">
+          <div class="text-left">
+            <div class="inline-flex items-center gap-2 bg-teal-400/10 text-teal-300 border border-teal-400/30 px-3 py-1 rounded-full text-xs font-tech font-bold uppercase mb-4">
+              <img src="/assets/mascot/doge-sleeping.svg" alt="Security" class="w-4 h-4 object-contain" style="width: 16px; height: 16px;" />
+              <span>SECURITY ARCHITECTURE</span>
+            </div>
+            <h2 class="font-display text-3xl sm:text-4xl lg:text-5xl text-white tracking-wide max-w-3xl leading-tight">
+              Architected for containment, not blind trust.
+            </h2>
+          </div>
+          <a href="/docs/security" class="mt-6 md:mt-0 inline-flex items-center gap-2 font-tech text-sm text-teal-400 hover:text-teal-300 border-b border-teal-400 pb-1">
+            <span>Read security documentation →</span>
+          </a>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
+          <!-- Sandboxed Containers -->
+          <div class="bg-zinc-900/90 border border-white/10 rounded-2xl p-6 comic-card-shadow flex flex-col justify-between">
+            <div>
+              <h3 class="font-display text-2xl text-white mb-2">MICRO-CONTAINERS</h3>
+              <p class="font-tech text-xs text-gray-400 mb-6">Each task runs in an isolated Cloudflare Sandbox gVisor container. Malicious code cannot escape.</p>
+            </div>
+            <div class="bg-black/80 p-4 rounded-xl border border-white/5 font-tech text-xs text-teal-300">
+              ✓ gVisor Kernel Sandbox <br />
+              ✓ Ephemeral Filesystem <br />
+              ✓ Destroyed on Completion
+            </div>
+          </div>
+
+          <!-- Data Protection -->
+          <div class="bg-zinc-900/90 border border-white/10 rounded-2xl p-6 comic-card-shadow flex flex-col justify-between">
+            <div>
+              <h3 class="font-display text-2xl text-white mb-2">ACCOUNT OWNED</h3>
+              <p class="font-tech text-xs text-gray-400 mb-6">Runs 100% inside your own Cloudflare account. Your source code never touches third-party SaaS servers.</p>
+            </div>
+            <div class="bg-black/80 p-4 rounded-xl border border-white/5 font-tech text-xs text-emerald-400">
+              ✓ Zero Third-Party SaaS <br />
+              ✓ Encrypted Secrets <br />
+              ✓ Direct GitHub Auth
+            </div>
+          </div>
+
+          <!-- Human-in-the-Loop -->
+          <div class="bg-zinc-900/90 border border-white/10 rounded-2xl p-6 comic-card-shadow flex flex-col justify-between">
+            <div>
+              <h3 class="font-display text-2xl text-white mb-2">APPROVAL GATES</h3>
+              <p class="font-tech text-xs text-gray-400 mb-6">Every repository modification and shell command requires explicit confirmation before execution starts.</p>
+            </div>
+            <div class="bg-black/80 p-4 rounded-xl border border-white/5 font-tech text-center">
+              <span class="text-2xl font-bold text-teal-400">Human-Gated</span>
+              <div class="text-[11px] text-gray-400 mt-1">Full delegation preview</div>
+            </div>
+          </div>
+
+          <!-- Egress Controls -->
+          <div class="bg-zinc-900/90 border border-white/10 rounded-2xl p-6 comic-card-shadow flex flex-col justify-between">
+            <div>
+              <h3 class="font-display text-2xl text-white mb-2">EGRESS FILTERING</h3>
+              <p class="font-tech text-xs text-gray-400 mb-6">Sandbox outbound network traffic is strictly regulated to prevent data exfiltration.</p>
+            </div>
+            <img src="/assets/mascot/doge-mascot-sunglasses.svg" alt="Doge Guard" class="w-full h-auto object-contain rounded-lg" style="max-height: 110px;" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: SELF-HOSTING & OPEN SOURCE (No Fake SaaS Pricing Tiers) -->
+    <section id="pricing" class="py-24 border-t border-white/10 relative">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="text-center max-w-3xl mx-auto mb-16">
+          <div class="inline-flex items-center gap-2 bg-teal-400/10 text-teal-300 border border-teal-400/30 px-3 py-1 rounded-full text-xs font-tech font-bold uppercase mb-4">
+            <span class="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
+            <span>100% OPEN SOURCE & ACCOUNT-OWNED</span>
+          </div>
+          <h2 class="font-display text-4xl sm:text-5xl lg:text-6xl text-white tracking-wide leading-tight uppercase">
+            No Subscription Fees. No Seat Tax.
+          </h2>
+          <p class="font-tech text-gray-300 mt-4 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+            AI Intern is free open-source software under the MIT License. Deploy directly to your own Cloudflare account with zero middleman markups.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto items-stretch text-left">
+          <!-- Card 1: Community Open Source -->
+          <div class="bg-zinc-900/90 border-2 border-teal-500/40 rounded-3xl p-8 comic-card-teal flex flex-col justify-between relative overflow-hidden">
+            <div class="absolute top-4 right-4 bg-teal-400 text-black text-[11px] font-bold font-tech px-2.5 py-0.5 rounded-full uppercase">MIT LICENSE</div>
+            <div>
+              <div class="w-12 h-12 rounded-xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center text-teal-300 mb-6">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+              </div>
+              <h3 class="font-display text-3xl text-white">Full Source Transparency</h3>
+              <p class="font-tech text-xs text-teal-300 mt-1">Fork, inspect, and customize without limits</p>
+              
+              <ul class="space-y-3.5 font-tech text-sm text-gray-300 my-8">
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 font-bold mt-0.5">✓</span>
+                  <span><strong class="text-white">100% Open Source:</strong> Permissive MIT license with zero commercial restrictions.</span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 font-bold mt-0.5">✓</span>
+                  <span><strong class="text-white">Unlimited Team Seats:</strong> Add your whole team without paying $20–$50/user monthly SaaS fees.</span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 font-bold mt-0.5">✓</span>
+                  <span><strong class="text-white">Model Agnostic:</strong> Connect Claude 3.7, Gemini 2.5, OpenAI, or local weights with your own keys.</span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 font-bold mt-0.5">✓</span>
+                  <span><strong class="text-white">Extensible Workflows:</strong> Customize approval policies, webhook handlers, and container images.</span>
+                </li>
+              </ul>
+            </div>
+            <a href="/docs/getting-started" class="w-full text-center bg-teal-400 text-black font-display text-xl px-6 py-3.5 rounded-xl comic-btn-shadow border border-teal-300 hover:bg-teal-300 transition-all">
+              Deploy with Wrangler →
+            </a>
+          </div>
+
+          <!-- Card 2: Self-Hosted Cloudflare Infrastructure -->
+          <div class="bg-zinc-900/80 border border-white/10 rounded-3xl p-8 comic-card-shadow flex flex-col justify-between">
+            <div>
+              <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-300 mb-6">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+              <h3 class="font-display text-3xl text-white">Direct Infrastructure Control</h3>
+              <p class="font-tech text-xs text-gray-400 mt-1">Zero SaaS margin · Pay Cloudflare directly</p>
+              
+              <ul class="space-y-3.5 font-tech text-sm text-gray-300 my-8">
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 font-bold mt-0.5">✓</span>
+                  <span><strong class="text-white">Account Owned:</strong> Runs inside your own Cloudflare perimeter. Your code never leaves your account.</span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 font-bold mt-0.5">✓</span>
+                  <span><strong class="text-white">Direct Provider Billing:</strong> Pay your cloud and model providers directly with zero SaaS markup.</span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 font-bold mt-0.5">✓</span>
+                  <span><strong class="text-white">Per-Second Compute:</strong> Isolated Sandbox micro-containers bill only for exact active execution time.</span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 font-bold mt-0.5">✓</span>
+                  <span><strong class="text-white">Granular Spend Limits:</strong> Set hard budget caps and quotas in your own Cloudflare dashboard.</span>
+                </li>
+              </ul>
+            </div>
+            <a href="/docs/costs" class="w-full text-center bg-zinc-800 text-white font-tech text-sm px-6 py-3.5 rounded-xl border border-white/15 hover:bg-zinc-700 transition-colors">
+              Read Cloud Cost Breakdown →
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: FROM THE DOCS (Replacing fake blog with real documentation) -->
+    <section class="py-20 border-t border-white/10 bg-zinc-950/40">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="flex items-center justify-between mb-10">
+          <h2 class="font-display text-3xl sm:text-4xl text-white">Documentation & Guides</h2>
+          <a href="/docs/overview" class="font-tech text-xs text-teal-400 hover:underline">View all docs →</a>
+        </div>
+
+        <a href="/docs/deployment" class="block bg-zinc-900/90 border border-white/10 rounded-2xl p-6 sm:p-8 comic-card-shadow hover:border-teal-400/40 transition-colors group text-left">
+          <div class="flex flex-wrap items-center gap-3 text-xs font-tech mb-3">
+            <span class="bg-teal-400/10 text-teal-300 px-2.5 py-0.5 rounded border border-teal-400/30">Deployment Guide</span>
+            <span class="text-gray-400">Cloudflare Workers</span>
+            <span class="text-gray-500">· 5 min setup</span>
+          </div>
+          <h3 class="font-display text-2xl sm:text-3xl text-white group-hover:text-teal-300 transition-colors">
+            Deploy AI Intern to your Cloudflare account with Wrangler
+          </h3>
+          <p class="font-tech text-sm text-gray-400 mt-2 max-w-3xl leading-relaxed">
+            Configure your GitHub credentials, set up Cloudflare AI Gateway bindings, and deploy the orchestrator worker alongside isolated sandbox micro-containers in minutes.
+          </p>
+        </a>
+      </div>
+    </section>
+
+    <!-- SECTION: FINAL CTA -->
+    <section class="py-24 border-t border-white/10 relative overflow-hidden bg-gradient-to-b from-black to-zinc-950 text-center">
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 relative z-10">
+        <!-- Floating Mascot Badge -->
+        <img src="/assets/mascot/doge-avatar.svg" alt="Doge Mascot" class="w-28 h-28 mx-auto mb-8 object-contain filter drop-shadow-[0_0_25px_rgba(11,159,149,0.6)]" style="width: 112px; height: 112px;" />
+        
+        <h2 class="font-display text-5xl sm:text-7xl text-white uppercase tracking-tight mb-4">
+          Add AI Intern to your team
+        </h2>
+        <p class="font-tech text-lg sm:text-xl text-gray-300 max-w-xl mx-auto mb-10">
+          The transparent, self-hosted coding partner that runs on your infrastructure.
+        </p>
+
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <a href="/docs/getting-started" class="w-full sm:w-auto bg-teal-400 text-black font-display text-2xl tracking-wider px-8 py-4 rounded-xl comic-btn-shadow border border-teal-300">
+            Deploy on Cloudflare
+          </a>
+          <a href="/docs/overview" class="w-full sm:w-auto bg-zinc-900 text-white font-tech text-base px-8 py-4 rounded-xl border border-white/15 hover:border-teal-400 transition-colors">
+            Read Documentation
+          </a>
+        </div>
+
+        <!-- Doge Riding Jetboard Illustration -->
+        <div class="mt-14 max-w-sm mx-auto">
+          <img src="/assets/mascot/doge-riding.svg" alt="Doge Riding" class="w-full h-auto object-contain mascot-bouncing mascot-hover-wiggle transition-transform" style="max-height: 220px;" />
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-white/10 bg-black py-16 text-left">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12 font-tech text-xs">
+        <div>
+          <h4 class="text-white font-bold uppercase tracking-wider mb-4">Project</h4>
+          <ul class="space-y-2.5 text-gray-400">
+            <li><a href="https://github.com/princepal9120/ai-intern" target="_blank" rel="noopener noreferrer" class="hover:text-white">GitHub Repository</a></li>
+            <li><a href="/docs/contributing" class="hover:text-white">Contributing</a></li>
+            <li><a href="https://github.com/princepal9120/ai-intern/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" class="hover:text-white">MIT License</a></li>
+            <li><a href="/docs/overview" class="hover:text-white">Architecture</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-white font-bold uppercase tracking-wider mb-4">Platform</h4>
+          <ul class="space-y-2.5 text-gray-400">
+            <li><a href="/docs/security" class="hover:text-white">Sandbox Isolation</a></li>
+            <li><a href="/docs/dashboard" class="hover:text-white">Web Dashboard</a></li>
+            <li><a href="/docs/automations" class="hover:text-white">Webhook Automations</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-white font-bold uppercase tracking-wider mb-4">Resources</h4>
+          <ul class="space-y-2.5 text-gray-400">
+            <li><a href="/docs/getting-started" class="hover:text-white">Quickstart Guide</a></li>
+            <li><a href="/docs/deployment" class="hover:text-white">Wrangler Deployment</a></li>
+            <li><a href="/docs/costs" class="hover:text-white">Cloud Costs</a></li>
+            <li><a href="/docs/api" class="hover:text-white">API Reference</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-white font-bold uppercase tracking-wider mb-4">Open Source</h4>
+          <img src="/assets/mascot/doge-avatar.svg" alt="Doge badge" class="w-12 h-12 mb-3 object-contain" style="width: 48px; height: 48px;" />
+          <p class="text-[11px] text-gray-500">100% Free & Open Source under the MIT License.</p>
+        </div>
+      </div>
+
+      <div class="border-t border-white/10 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 font-tech text-xs text-gray-500">
+        <p>© 2026 AI Intern. Open Source under the MIT License.</p>
+        <p>Self-hosted coding agent on Cloudflare Workers & Sandbox.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Client-side interactions
+    document.querySelectorAll('.resolve-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLElement;
+        target.textContent = '✓ Resolved';
+        target.classList.remove('text-teal-400', 'border-teal-500/40');
+        target.classList.add('text-emerald-400', 'border-emerald-500/40', 'bg-emerald-500/10');
+      });
+    });
+
+    const replayBtn = document.getElementById('hero-replay-btn');
+    if (replayBtn) {
+      replayBtn.addEventListener('click', () => {
+        replayBtn.textContent = 'Running...';
+        setTimeout(() => {
+          replayBtn.textContent = '↻ Replayed';
+          setTimeout(() => { replayBtn.textContent = '↻ Replay'; }, 1500);
+        }, 800);
+      });
+    }
+  </script>
+
+  <!-- animated Floating Interactive Mascot Assistant (Bottom-Right) -->
+  <div class="fixed bottom-6 right-6 z-50 flex items-end gap-3 group">
+    <div class="hidden sm:block opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 pointer-events-none bg-zinc-900/95 border border-teal-500/40 text-gray-200 text-xs font-tech px-4 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md max-w-xs">
+      <div class="flex items-center gap-1.5 text-teal-400 font-bold mb-0.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></span>
+        <span>AI INTERN ONLINE</span>
+      </div>
+      <p class="text-[11px] text-gray-300">Self-hosted in your Cloudflare account. Zero SaaS middleman fees.</p>
+    </div>
+    <a href="/docs/getting-started" class="relative block w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 via-teal-400 to-teal-600 p-1.5 shadow-[4px_4px_0px_0px_#0B9F95] hover:shadow-[1px_1px_0px_0px_#0B9F95] hover:translate-x-1 hover:translate-y-1 transition-all mascot-floating" aria-label="Quickstart Guide">
+      <img src="/assets/mascot/doge-mascot-sunglasses.svg" alt="AI Intern Mascot" class="w-full h-full object-contain filter drop-shadow" />
+      <span class="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-400 border-2 border-black rounded-full animate-ping"></span>
+      <span class="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-400 border-2 border-black rounded-full"></span>
+    </a>
+  </div>
+
+</body>
+</html>
+
+
+

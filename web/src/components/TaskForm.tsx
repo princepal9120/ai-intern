@@ -33,18 +33,23 @@ export function TaskForm({
   onSubmit,
   onClear,
 }: TaskFormProps = {}) {
+  const inputClass = "bg-[#0f1419] border border-[#2a3441] rounded-lg text-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4f9cf0] placeholder-gray-600 w-full";
+  const labelClass = "text-sm font-medium text-gray-400";
+  const buttonPrimary = "bg-[#4f9cf0] hover:bg-[#3b82f6] text-[#06121f] font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm";
+  const buttonSecondary = "bg-transparent border border-[#2a3441] hover:bg-[#2a3441] text-gray-300 font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm";
+
   return createElement(
     "form",
     {
       "data-testid": "task-submission-form",
       "aria-label": "Task submission form",
       onSubmit: onSubmit ?? ((event: FormEvent) => event.preventDefault()),
-      className: "form",
+      className: "flex flex-col gap-4",
     },
     createElement(
       "label",
-      { className: "field" },
-      createElement("span", null, "Repository URL"),
+      { className: "flex flex-col gap-1.5" },
+      createElement("span", { className: labelClass }, "Repository URL"),
       createElement("input", {
         type: "url",
         inputMode: "url",
@@ -52,18 +57,20 @@ export function TaskForm({
         name: "repoUrl",
         placeholder: "https://github.com/owner/repo",
         value: repoUrl,
+        className: inputClass,
         onChange: (event: { target: { value: string } }) =>
           onRepoUrlChange?.(event.target.value),
       }),
     ),
     createElement(
       "label",
-      { className: "field" },
-      createElement("span", null, "Base branch"),
+      { className: "flex flex-col gap-1.5" },
+      createElement("span", { className: labelClass }, "Base branch"),
       createElement("input", {
         type: "text",
         name: "baseBranch",
         value: baseBranch,
+        className: inputClass,
         onChange: (event: { target: { value: string } }) =>
           onBaseBranchChange?.(event.target.value),
         placeholder: "main",
@@ -71,8 +78,8 @@ export function TaskForm({
     ),
     createElement(
       "label",
-      { className: "field" },
-      createElement("span", null, "Task"),
+      { className: "flex flex-col gap-1.5" },
+      createElement("span", { className: labelClass }, "Task"),
       createElement("textarea", {
         required: true,
         name: "task",
@@ -80,43 +87,45 @@ export function TaskForm({
         placeholder:
           "Describe the change you want, e.g. fix the login redirect and add a test.",
         value: task,
+        className: inputClass + " resize-y",
         onChange: (event: { target: { value: string } }) =>
           onTaskChange?.(event.target.value),
       }),
     ),
     createElement(
       "label",
-      { className: "check" },
+      { className: "flex items-start gap-2 mt-1 cursor-pointer" },
       createElement("input", {
         type: "checkbox",
         name: "publishPullRequest",
         checked: publishPullRequest,
+        className: "mt-0.5 h-4 w-4 rounded border-gray-600 bg-[#0f1419] text-[#4f9cf0] focus:ring-[#4f9cf0] focus:ring-offset-[#182028]",
         onChange: (event: { target: { checked: boolean } }) =>
           onPublishPullRequestChange?.(event.target.checked),
       }),
       createElement(
         "span",
-        null,
+        { className: "text-sm text-gray-400 select-none" },
         "Open a pull request with the result (requires GITHUB_TOKEN)",
       ),
     ),
     createElement(
       "div",
-      { className: "actions" },
+      { className: "flex flex-wrap gap-3 mt-2" },
       createElement(
         "button",
-        { type: "submit", disabled: busy },
-        submitting ? "Submitting" : busy ? "Working" : "Send for approval",
+        { type: "submit", disabled: busy, className: buttonPrimary },
+        submitting ? "Submitting..." : busy ? "Working..." : "Send for approval",
       ),
       createElement(
         "button",
         {
           type: "button",
           onClick: onClear,
-          className: "secondary",
+          className: buttonSecondary,
           disabled: busy,
         },
-        clearing ? "Clearing history" : "Clear history",
+        clearing ? "Clearing history..." : "Clear history",
       ),
     ),
   );

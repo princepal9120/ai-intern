@@ -25,8 +25,12 @@ export interface DelegatedRun {
   error?: string;
 }
 
-/** Maximum concurrent coding agents. Matches the container max_instances. */
-export const MAX_CONCURRENT_RUNS = 3;
+/**
+ * Maximum concurrent coding agents. Must match `max_instances` in
+ * wrangler.jsonc; this is policy, not a platform limit (Cloudflare's own
+ * default is 20). Parallel runs cost no more — billing is container-seconds.
+ */
+export const MAX_CONCURRENT_RUNS = 5;
 
 export function createRun(args: {
   runId: string;

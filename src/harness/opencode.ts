@@ -10,7 +10,16 @@
 import type { CodingTaskInput } from "../opencode-input.js";
 import { DUMMY_PROVIDER_KEY } from "../provider-gateway.js";
 import { boundTail } from "../security.js";
-import type { AgentHarness } from "./types.js";
+import {
+  assertSupportedModel,
+  PROVIDER_HOSTS,
+  PROVIDER_KEY_ENV,
+  type AgentHarness,
+  type HarnessConfigFile,
+} from "./types.js";
+
+/** OpenCode is multi-provider; the gateway decides which are actually reachable. */
+export const OPENCODE_PROVIDERS = ["google", "anthropic", "openai"] as const;
 
 /** Thrown when a streamed OpenCode event line is malformed. */
 export class OpenCodeEventError extends Error {}
@@ -65,16 +74,15 @@ function summarizeUnknown(record: Record<string, unknown>): string {
  */
 export function buildOpencodeConfig(input: CodingTaskInput): Record<string, unknown> {
   const model = input.codingModel;
-  if (!model.startsWith("google/")) {
-    throw new Error(`Unsupported coding model ${JSON.stringify(model)}: only google/* models are supported.`);
-  }
+  const provider = assertSupportedModel("opencode", OPENCODE_PROVIDERS, model);
   return {
     $schema: "https://opencode.ai/config.json",
     model,
-    enabled_providers: ["google"],
+    // Only the provider actually in use; every other one stays off.
+    enabled_providers: [provider],
     autoupdate: false,
     provider: {
-      google: {
+      [provider]: {
         options: {
           apiKey: DUMMY_PROVIDER_KEY,
         },
@@ -103,7 +111,28 @@ export function buildOpencodeArgv(input: CodingTaskInput, workdir: string): stri
 
 export class OpenCodeHarness implements AgentHarness {
   readonly name = "opencode" as const;
-  readonly egressHosts = ["generativelanguage.googleapis.com"];
+  readonly supportedProviders = OPENCODE_PROVIDERS;
+
+  egressHosts(model: string): string[] {
+    const provider = assertSupportedModel(this.name, this.supportedProviders, model);
+    return [PROVIDER_HOSTS[provider] as string];
+  }
+
+  configFile(input: CodingTaskInput, sandboxId: string): HarnessConfigFile {
+    return {
+      path: `/workspace/${sandboxId}.opencode.json`,
+      contents: JSON.stringify(buildOpencodeConfig(input), null, 2),
+    };
+  }
+
+  env(input: CodingTaskInput, configPath: string | null): Record<string, string> {
+    const provider = assertSupportedModel(this.name, this.supportedProviders, input.codingModel);
+    return {
+      ...(configPath ? { OPENCODE_CONFIG: configPath } : {}),
+      OPENCODE_DISABLE_AUTOUPDATE: "true",
+      [PROVIDER_KEY_ENV[provider] as string]: DUMMY_PROVIDER_KEY,
+    };
+  }
 
   buildConfig(input: CodingTaskInput): Record<string, unknown> {
     return buildOpencodeConfig(input);
