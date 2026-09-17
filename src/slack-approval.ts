@@ -289,11 +289,21 @@ export async function handleSlackInteract(
       await dispatchReject?.(interaction.pointer, interaction.userId);
     }
   })();
+  // The ack already went out, so a dispatch failure must surface to the human
+  // in Slack rather than vanish into an unhandled rejection.
+  const reported = work.catch((error: unknown) => {
+    const detail = error instanceof Error ? error.message : String(error);
+    return respondEphemeral(
+      interaction.responseUrl,
+      `The ${approved ? "approval" : "rejection"} could not be recorded: ${detail}`,
+      deps.respond,
+    );
+  });
   if (ctx) {
     // Ack now (<3s); the dispatch continues in the background.
-    ctx.waitUntil(work);
+    ctx.waitUntil(reported);
   } else {
-    await work;
+    await reported;
   }
   return new Response("", { status: 200 });
 }

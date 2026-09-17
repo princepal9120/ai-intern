@@ -38,6 +38,7 @@ export interface GitHubDeps {
 
 const API_BASE = "https://api.github.com";
 const USER_AGENT = "ai-intern";
+const API_TIMEOUT_MS = 30_000;
 
 function authHeaders(token: string): Record<string, string> {
   return {
@@ -53,13 +54,21 @@ function describeError(status: number, bodyText: string): string {
   return `GitHub API request failed with status ${status}: ${snippet}`;
 }
 
-async function api<T>(deps: Required<GitHubDeps>, path: string, init?: RequestInit): Promise<T> {
-  const response = await deps.fetchImpl(`${deps.apiBase}${path}`, init);
+async function api<T>(
+  deps: Required<GitHubDeps>,
+  path: string,
+  init?: RequestInit,
+  signal?: AbortSignal,
+): Promise<T> {
+  const timeout = AbortSignal.timeout(API_TIMEOUT_MS);
+  const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  const response = await deps.fetchImpl(`${deps.apiBase}${path}`, { ...init, signal: combined });
   const text = await response.text();
   if (!response.ok) {
     throw new Error(describeError(response.status, text));
   }
-  return JSON.parse(text) as T;
+  // 204 responses (e.g. ref deletion) carry no body.
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 /**
@@ -133,16 +142,27 @@ export async function publishFilesAsPullRequest(
     sha: commit.sha,
   }));
 
-  const pull = await api<{ html_url: string; number: number }>(
-    resolved,
-    `/repos/${owner}/${repo}/pulls`,
-    json({
-      title: request.title,
-      head: request.newBranch,
-      base: request.baseBranch,
-      body: request.body,
-    }),
-  );
+  let pull: { html_url: string; number: number };
+  try {
+    pull = await api<{ html_url: string; number: number }>(
+      resolved,
+      `/repos/${owner}/${repo}/pulls`,
+      json({
+        title: request.title,
+        head: request.newBranch,
+        base: request.baseBranch,
+        body: request.body,
+      }),
+    );
+  } catch (error) {
+    // Leave no orphaned branch behind when the PR cannot be opened.
+    await api<unknown>(resolved, `/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(request.newBranch)}`, {
+      method: "DELETE",
+      headers,
+    }).catch(() => undefined);
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${message} (branch ${request.newBranch} was removed).`);
+  }
 
   return {
     branch: request.newBranch,

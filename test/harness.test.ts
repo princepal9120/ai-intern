@@ -147,6 +147,7 @@ describe("claude-code harness (T22)", () => {
     expect(claudeCodeHarness.configFile()).toBeNull();
     expect(claudeCodeHarness.buildArgv(input("anthropic/claude-opus-5"), "/workspace/x")).toEqual([
       "claude", "--print", "--output-format", "stream-json", "--verbose",
+      "--permission-mode", "acceptEdits",
       "--model", "claude-opus-5", "--add-dir", "/workspace/x", "Fix it.",
     ]);
   });

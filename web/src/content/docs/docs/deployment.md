@@ -5,7 +5,7 @@ description: Account preparation and remaining rollout blockers.
 
 ## Readiness first
 
-**Do not treat this as production until T10 is dated in `VERIFICATION.md`.** Put Cloudflare Access on the Worker, with a bypass only for `/api/slack/*` and `/api/github/webhook`. Read [Security](/docs/security/) and [Readiness](/docs/readiness/) first.
+**Do not treat this as production until T10 is dated in `VERIFICATION.md`.** Put Cloudflare Access on the Worker, with a bypass only for `/api/slack/events`, `/api/slack/command`, and `/api/github/webhook`. Read [Security](/docs/security/) and [Readiness](/docs/readiness/) first.
 
 Live operation requires a Cloudflare account with Workers, Durable Objects, Workers AI, and Containers/Sandbox access. Check current eligibility, quotas, and pricing in the [Containers](https://developers.cloudflare.com/containers/) and [Sandbox](https://developers.cloudflare.com/sandbox/) documentation. No provisioning time is guaranteed.
 

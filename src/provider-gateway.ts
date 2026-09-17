@@ -2,9 +2,12 @@
 export const DUMMY_PROVIDER_KEY = "ai-intern-dummy-key";
 export const GOOGLE_API_HOST = "generativelanguage.googleapis.com";
 
+/** Provider API headers that constrain the request shape, not the credential. */
+const PASSTHROUGH_HEADERS = ["content-type", "accept", "anthropic-version", "anthropic-beta"];
+
 export function sanitizeContainerHeaders(incoming: Headers): Headers {
   const headers = new Headers();
-  for (const name of ["content-type", "accept"]) {
+  for (const name of PASSTHROUGH_HEADERS) {
     const value = incoming.get(name);
     if (value) headers.set(name, value);
   }

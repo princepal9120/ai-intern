@@ -8,6 +8,9 @@
     "directory": "./public",
     "not_found_handling": "404-page",
   },
+  // Version preview URLs are reachable without a Cloudflare Access policy;
+  // the header-only Worker gate is not authentication on its own.
+  "preview_urls": false,
   "vars": {
     "GATEWAY_ID": "default",
     "ORCHESTRATOR_MODEL": "@cf/meta/llama-3.1-8b-instruct",

@@ -114,6 +114,10 @@ export class ClaudeCodeHarness implements AgentHarness {
       "--output-format",
       "stream-json",
       "--verbose",
+      // Headless run: edit tools are auto-approved inside the sandbox, which is
+      // the isolation boundary. Interactive prompting would hang the run.
+      "--permission-mode",
+      "acceptEdits",
       "--model",
       stripProvider(input.codingModel),
       "--add-dir",

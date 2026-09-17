@@ -23,6 +23,7 @@ export interface DelegatedRun {
   updatedAt: number;
   summary?: string;
   error?: string;
+  diff?: string;
 }
 
 /**
@@ -58,7 +59,7 @@ export function createRun(args: {
 export function transitionRun(
   run: DelegatedRun,
   status: RunStatus,
-  patch?: { summary?: string; error?: string },
+  patch?: { summary?: string; error?: string; diff?: string },
   now?: number,
 ): DelegatedRun {
   if (run.status === "cancelled" || run.status === "aborted") return run;
@@ -67,6 +68,7 @@ export function transitionRun(
     status,
     summary: patch?.summary ?? run.summary,
     error: patch?.error ?? run.error,
+    diff: patch?.diff ?? run.diff,
     updatedAt: now ?? Date.now(),
   };
 }
@@ -110,7 +112,7 @@ export class RunStore {
   transition(
     runId: string,
     status: RunStatus,
-    patch?: { summary?: string; error?: string },
+    patch?: { summary?: string; error?: string; diff?: string },
   ): DelegatedRun | null {
     let updated: DelegatedRun | null = null;
     this.write(
@@ -127,3 +129,4 @@ export class RunStore {
     this.write([]);
   }
 }
+

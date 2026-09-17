@@ -15,7 +15,7 @@ const INPUT: CodingTaskInput = {
   baseBranch: "main",
   publishPullRequest: false,
   sandboxId: "run-abcdef12345678",
-  codingModel: "google/gemini-2.0-flash",
+  codingModel: "google/gemini-3.5-flash-lite",
 };
 
 describe("agent tool input envelope", () => {

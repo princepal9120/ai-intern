@@ -17,7 +17,7 @@ vi.mock("../src/github.js", () => ({ publishFilesAsPullRequest: mocks.publish })
 const INPUT: CodingTaskInput = {
   repoUrl: "https://github.com/owner/repo", task: "Fix it.", baseBranch: "main",
   publishPullRequest: false, sandboxId: "run-abcdef12345678",
-  codingModel: "google/gemini-2.0-flash",
+  codingModel: "google/gemini-3.5-flash-lite",
 };
 const RESULT: CodingTaskResult = {
   status: "completed", exitCode: 0, stderrTail: "", changedFiles: ["a.ts"],

@@ -51,8 +51,10 @@ describe("schedule triggers", () => {
     const now = Date.UTC(2026, 8, 17, 12, 0, 30);
     // Missed several ticks while the worker was down: still exactly one run.
     expect(isScheduleDue("*/5 * * * *", now, now - 60 * 60 * 1000)).toBe(true);
-    // Non-matching minute never fires.
-    expect(isScheduleDue("*/5 * * * *", Date.UTC(2026, 8, 17, 12, 3, 0), undefined)).toBe(false);
+    // The tick fired a moment after minute 0: the occurrence is still in window.
+    expect(isScheduleDue("*/5 * * * *", now + 45 * 1000, undefined)).toBe(true);
+    // No occurrence anywhere in the window: never fires.
+    expect(isScheduleDue("0 3 * * 1", Date.UTC(2026, 8, 17, 12, 0, 30), undefined)).toBe(false);
     // Already fired in this bucket: coalesced, no backlog run.
     const fired = recordTrigger(
       createAutomation({
@@ -65,6 +67,9 @@ describe("schedule triggers", () => {
     );
     expect(fired.runCount).toBe(1);
     expect(fired.lastTriggeredAt).toBe(now);
+    const later = Date.UTC(2026, 8, 17, 12, 5, 0);
+    expect(isScheduleDue("*/5 * * * *", later, fired.lastTriggeredAt)).toBe(true);
+    // Same minute, already fired: coalesced.
     expect(isScheduleDue("*/5 * * * *", now + 1000, fired.lastTriggeredAt)).toBe(false);
   });
 

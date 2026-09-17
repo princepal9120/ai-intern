@@ -10,6 +10,8 @@
  * are harness-dispatched (default: OpenCode).
  */
 import type { CodingTaskInput, CodingTaskResult } from "./opencode-input.js";
+import { ClaudeCodeErrorEvent } from "./harness/claude-code.js";
+import { CodexErrorEvent } from "./harness/codex.js";
 import { OpenCodeErrorEvent as OpenCodeErrorEventImpl, opencodeHarness } from "./harness/opencode.js";
 import type { AgentHarness } from "./harness/types.js";
 import { boundTail, redactSecrets, shellJoin, shellQuote } from "./security.js";
@@ -124,7 +126,11 @@ export class SandboxRuntimeAdapter implements RuntimeAdapter {
     } catch (error) {
       await output.finish();
       throwIfAborted(opts?.signal);
-      if (error instanceof OpenCodeErrorEventImpl) {
+      if (
+        error instanceof OpenCodeErrorEventImpl ||
+        error instanceof ClaudeCodeErrorEvent ||
+        error instanceof CodexErrorEvent
+      ) {
         return failureResult(error.message, 0, "");
       }
       return failureResult(`OpenCode execution failed: ${shortError(error)}`, 0, "");
@@ -251,7 +257,13 @@ function streamProgress(harness: AgentHarness, emit: ProgressEmitter, _signal?: 
           if (text) emitText(`[opencode] ${text}`);
         } catch (error) {
           // Error events must propagate so the run fails honestly.
-          if (error instanceof OpenCodeErrorEventImpl) throw error;
+          if (
+            error instanceof OpenCodeErrorEventImpl ||
+            error instanceof ClaudeCodeErrorEvent ||
+            error instanceof CodexErrorEvent
+          ) {
+            throw error;
+          }
           emitText("[opencode] malformed event line (redacted).");
         }
       }
@@ -275,7 +287,61 @@ function summarizeRun(input: CodingTaskInput, changedFiles: string[], stdoutTail
 interface CollectedChanges {
   changedFiles: string[];
   diff: string;
-  files: Array<{ path: string; content: string; encoding: "utf8" | "base64" }>;
+  files: Array<{ path: string; content: string | null; encoding: "utf8" | "base64" }>;
+}
+
+/** Decode a quoted porcelain path (`\"`, `\\`, `\\n`, `\\t`, `\\ooo`). */
+export function unescapePorcelainPath(path: string): string {
+  if (!(path.startsWith('"') && path.endsWith('"') && path.length >= 2)) return path;
+  const inner = path.slice(1, -1);
+  let out = "";
+  for (let i = 0; i < inner.length; i++) {
+    const ch = inner[i];
+    if (ch !== "\\") {
+      out += ch;
+      continue;
+    }
+    const next = inner[i + 1];
+    if (next === "n") {
+      out += "\n";
+      i += 1;
+    } else if (next === "t") {
+      out += "\t";
+      i += 1;
+    } else if (next === '"' || next === "\\") {
+      out += next;
+      i += 1;
+    } else if (next !== undefined && next >= "0" && next <= "7") {
+      let oct = "";
+      let j = i + 1;
+      while (j < inner.length && oct.length < 3 && inner[j]! >= "0" && inner[j]! <= "7") {
+        oct += inner[j];
+        j += 1;
+      }
+      out += String.fromCharCode(parseInt(oct, 8));
+      i = j - 1;
+    } else if (next !== undefined) {
+      out += next;
+      i += 1;
+    }
+  }
+  return out;
+}
+
+function porcelainPath(rest: string): string {
+  const arrow = rest.indexOf(" -> ");
+  const path = arrow >= 0 ? rest.slice(arrow + 4) : rest;
+  return unescapePorcelainPath(path);
+}
+
+function porcelainRenameOld(rest: string): string | null {
+  const arrow = rest.indexOf(" -> ");
+  if (arrow < 0) return null;
+  return unescapePorcelainPath(rest.slice(0, arrow));
+}
+
+function isSafeRepoPath(path: string): boolean {
+  return Boolean(path) && !path.includes("..") && !path.startsWith("/");
 }
 
 /** Parse `git status --porcelain` output into repo-relative paths. */
@@ -285,39 +351,35 @@ export function parsePorcelainStatus(output: string): string[] {
     if (line.length < 4) continue;
     const rest = line.slice(3).trim();
     if (!rest) continue;
-    // Rename entries look like "old -> new"; the new path is what changed.
-    const arrow = rest.indexOf(" -> ");
-    const path = arrow >= 0 ? rest.slice(arrow + 4) : rest;
-    const unquoted = path.startsWith('"') && path.endsWith('"') ? path.slice(1, -1) : path;
-    if (unquoted && !unquoted.includes("..") && !unquoted.startsWith("/")) {
-      paths.push(unquoted);
-    }
+    const path = porcelainPath(rest);
+    if (isSafeRepoPath(path)) paths.push(path);
   }
   return [...new Set(paths)];
 }
 
-/** Parse `git status --porcelain` output and return deleted file paths. */
+/** Parse `git status --porcelain` and return deleted (or rename-source) paths. */
 function parsePorcelainDeleted(output: string): Set<string> {
   const deleted = new Set<string>();
   for (const line of output.split("\n")) {
     if (line.length < 4) continue;
     const statusCode = line.slice(0, 2);
-    // " D" = deleted in worktree, "D " = deleted and staged
-    if (statusCode !== " D" && statusCode !== "D ") continue;
     const rest = line.slice(3).trim();
     if (!rest) continue;
-    const arrow = rest.indexOf(" -> ");
-    const path = arrow >= 0 ? rest.slice(arrow + 4) : rest;
-    const unquoted = path.startsWith('"') && path.endsWith('"') ? path.slice(1, -1) : path;
-    if (unquoted && !unquoted.includes("..") && !unquoted.startsWith("/")) {
-      deleted.add(unquoted);
+    const xy = statusCode.replace(" ", "");
+    if (xy.includes("D")) {
+      const path = porcelainPath(rest);
+      if (isSafeRepoPath(path)) deleted.add(path);
+    }
+    if (xy.includes("R")) {
+      const oldPath = porcelainRenameOld(rest);
+      if (oldPath && isSafeRepoPath(oldPath)) deleted.add(oldPath);
     }
   }
   return deleted;
 }
 
 async function collectChanges(ops: SandboxOps, workdir: string, signal?: AbortSignal): Promise<CollectedChanges> {
-  const status = await ops.exec(shellJoin(["git", "status", "--porcelain"]), {
+  const status = await ops.exec(shellJoin(["git", "status", "--porcelain", "-uall"]), {
     cwd: workdir,
     timeoutMs: GIT_TIMEOUT_MS,
     signal,
@@ -352,7 +414,6 @@ async function collectChanges(ops: SandboxOps, workdir: string, signal?: AbortSi
   const files: CollectedChanges["files"] = [];
   let totalChars = 0;
   for (const path of changedFiles) {
-    // Skip reading deleted files: they no longer exist on disk.
     if (deletedFiles.has(path)) continue;
     if (totalChars >= MAX_TOTAL_FILE_CHARS) break;
     const fullPath = `${workdir}/${path}`;
@@ -369,6 +430,11 @@ async function collectChanges(ops: SandboxOps, workdir: string, signal?: AbortSi
       totalChars += Math.ceil(content.length * 3 / 4);
     }
     files.push({ path, content, encoding: read.kind });
+  }
+  // Deletions and rename sources are not on disk; a null-content entry is what
+  // removes them from the published tree (src/github.ts).
+  for (const path of deletedFiles) {
+    files.push({ path, content: null, encoding: "utf8" });
   }
   return { changedFiles, diff, files };
 }

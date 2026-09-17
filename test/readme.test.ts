@@ -19,7 +19,9 @@ describe("README structure (T24 honest-ship contract)", () => {
   });
 
   it("lists ordered prerequisites including the Access bypass", () => {
-    expect(README).toContain("/api/slack/*");
+    // Exact signature-authenticated paths, matching SIGNATURE_AUTHENTICATED.
+    expect(README).toContain("/api/slack/events");
+    expect(README).toContain("/api/slack/command");
     expect(README).toContain("/api/github/webhook");
     expect(README).toContain("GITHUB_TOKEN");
   });

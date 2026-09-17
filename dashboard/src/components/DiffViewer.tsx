@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import { useState, useMemo, type JSX } from "react";
 
 export interface DiffViewerProps {
   diff: string;
@@ -29,28 +29,125 @@ function classifyLine(line: string): LineKind {
 }
 
 const LINE_CLASSES: Record<LineKind, string> = {
-  file: "font-bold text-[#e6edf3]",
-  hunk: "text-[#4f9cf0]",
-  add: "text-[#4cc38a] bg-[#4cc38a]/10 block w-full px-1 -mx-1",
-  del: "text-[#f06666] bg-[#f06666]/10 block w-full px-1 -mx-1",
-  context: "text-[#8b98a9]",
+  file: "font-bold text-[#e6edf3] bg-[#1c2430]/60 py-0.5 px-1 rounded block",
+  hunk: "text-[#4f9cf0] font-mono text-[11px] bg-[#4f9cf0]/10 py-0.5 px-1 block my-0.5 rounded",
+  add: "text-[#4cc38a] bg-[#4cc38a]/15 block w-full px-1.5 -mx-1.5 border-l-2 border-[#4cc38a]",
+  del: "text-[#f06666] bg-[#f06666]/15 block w-full px-1.5 -mx-1.5 border-l-2 border-[#f06666]",
+  context: "text-[#8b98a9] block px-1.5",
 };
 
 export function DiffViewer({ diff, runId }: DiffViewerProps): JSX.Element {
+  const [copied, setCopied] = useState(false);
+
+  const stats = useMemo(() => {
+    if (!diff) return { additions: 0, deletions: 0, files: 0 };
+    const lines = diff.split("\n");
+    let additions = 0;
+    let deletions = 0;
+    let files = 0;
+    for (const line of lines) {
+      if (line.startsWith("diff --git")) files++;
+      else if (line.startsWith("+") && !line.startsWith("+++")) additions++;
+      else if (line.startsWith("-") && !line.startsWith("---")) deletions++;
+    }
+    return { additions, deletions, files };
+  }, [diff]);
+
   if (!diff) {
     return <p className="text-xs text-[#8b98a9] italic">No file changes produced</p>;
   }
+
   const lines = diff.split("\n");
+
+  const copyDiff = async () => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(diff);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        // Fallback or ignore
+      }
+    }
+  };
+
+  const downloadPatch = () => {
+    if (typeof document === "undefined") return;
+    const blob = new Blob([diff], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `patch-${runId || "task"}.diff`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <pre className="font-mono text-xs leading-[1.45] bg-[#0f1419] border border-[#2a3441] rounded-lg p-3 mt-2 max-h-72 overflow-auto whitespace-pre block w-full" aria-label={runId ? `Diff for ${runId}` : "Unified diff"}>
-      <code className="block w-full">
-        {lines.map((line, index) => (
-          <span key={index} className={LINE_CLASSES[classifyLine(line)]}>
-            {line}
-            {index < lines.length - 1 ? "\n" : ""}
-          </span>
-        ))}
-      </code>
-    </pre>
+    <div className="flex flex-col gap-2 w-full mt-2">
+      {/* Diff Header Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-[#182028] border border-[#2a3441] rounded-t-lg text-xs">
+        <div className="flex items-center gap-2 font-mono">
+          <span className="text-[#8b98a9] font-medium">Unified Diff</span>
+          {stats.files > 0 ? (
+            <span className="bg-[#0f1419] text-[#e6edf3] border border-[#2a3441] rounded px-1.5 py-0.5 text-[11px]">
+              {stats.files} file{stats.files === 1 ? "" : "s"}
+            </span>
+          ) : null}
+          <span className="text-[#4cc38a] font-semibold">+{stats.additions}</span>
+          <span className="text-[#f06666] font-semibold">-{stats.deletions}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={copyDiff}
+            className="text-[11px] font-sans px-2.5 py-1 rounded bg-[#0f1419] hover:bg-[#2a3441] text-[#e6edf3] border border-[#2a3441] transition-colors flex items-center gap-1.5"
+            title="Copy diff to clipboard"
+          >
+            {copied ? (
+              <>
+                <svg className="w-3.5 h-3.5 text-[#4cc38a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Copied</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5 text-[#8b98a9]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <span>Copy diff</span>
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={downloadPatch}
+            className="text-[11px] font-sans px-2.5 py-1 rounded bg-[#0f1419] hover:bg-[#2a3441] text-[#8b98a9] hover:text-[#e6edf3] border border-[#2a3441] transition-colors flex items-center gap-1"
+            title="Download unified .diff file"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span>.diff</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Code Block */}
+      <pre
+        className="font-mono text-xs leading-[1.45] bg-[#0f1419] border border-t-0 border-[#2a3441] rounded-b-lg p-3 -mt-2 max-h-96 overflow-auto whitespace-pre block w-full shadow-inner"
+        aria-label={runId ? `Diff for ${runId}` : "Unified diff"}
+      >
+        <code className="block w-full font-mono">
+          {lines.map((line, index) => (
+            <span key={index} className={LINE_CLASSES[classifyLine(line)]}>
+              {line}
+              {index < lines.length - 1 ? "\n" : ""}
+            </span>
+          ))}
+        </code>
+      </pre>
+    </div>
   );
 }
+

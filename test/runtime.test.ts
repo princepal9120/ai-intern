@@ -48,7 +48,7 @@ const INPUT: CodingTaskInput = {
   baseBranch: "main",
   publishPullRequest: false,
   sandboxId: "run-abcdef12345678",
-  codingModel: "google/gemini-2.0-flash",
+  codingModel: "google/gemini-3.5-flash-lite",
 };
 
 interface RecordedExec {
@@ -174,7 +174,7 @@ describe("opencode config and argv", () => {
   it("builds an isolated google-provider config with a dummy key", () => {
     const config = buildOpencodeConfig(INPUT);
     expect(config).toMatchObject({
-      model: "google/gemini-2.0-flash",
+      model: "google/gemini-3.5-flash-lite",
       enabled_providers: ["google"],
       autoupdate: false,
     });
@@ -204,7 +204,7 @@ describe("opencode config and argv", () => {
       "--format",
       "json",
       "--model",
-      "google/gemini-2.0-flash",
+      "google/gemini-3.5-flash-lite",
       "--dir",
       "/workspace/x",
       INPUT.task,
@@ -485,7 +485,7 @@ describe("complete file collection bounds", () => {
     expect(result.files).toHaveLength(0);
   });
 
-  it("counts deleted files without reading them", async () => {
+  it("records deleted files as null content without reading them", async () => {
     const ops = makeFakeOps();
     const reads: string[] = [];
     ops.exec = async (command, opts) => {
@@ -506,7 +506,10 @@ describe("complete file collection bounds", () => {
     const result = await adapter.runCodingTask(ops, INPUT, () => {});
     expect(result.changedFiles).toEqual(["src/deleted.ts", "src/a.ts"]);
     expect(reads).toEqual(["/workspace/run-abcdef12345678/src/a.ts"]);
-    expect(result.files).toHaveLength(1);
+    expect(result.files).toEqual([
+      { path: "src/a.ts", content: "content", encoding: "utf8" },
+      { path: "src/deleted.ts", content: null, encoding: "utf8" },
+    ]);
   });
 });
 
@@ -594,8 +597,11 @@ describe("worker authentication gate (T7)", () => {
 
   it("exposes SIGNATURE_AUTHENTICATED exemptions for slack and github webhook", async () => {
     const mod = await import("../src/index.js");
-    expect(mod.SIGNATURE_AUTHENTICATED).toContain("/api/slack/");
+    expect(mod.SIGNATURE_AUTHENTICATED).toContain("/api/slack/events");
+    expect(mod.SIGNATURE_AUTHENTICATED).toContain("/api/slack/command");
     expect(mod.SIGNATURE_AUTHENTICATED).toContain("/api/github/webhook");
+    // Exact paths only: an unrelated sibling must not be exempt.
+    expect(mod.SIGNATURE_AUTHENTICATED).not.toContain("/api/slack/");
   });
 
   it("isAuthenticated exempts signature-authenticated paths without an Access header", async () => {

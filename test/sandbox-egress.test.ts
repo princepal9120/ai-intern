@@ -6,11 +6,26 @@ import {
   forwardGoogle,
   forwardOpenAI,
   GATEWAY_PROVIDERS,
+  isAllowedGitHubRequest,
   isWithinRepoScope,
   type EgressEnv,
 } from "../src/egress.js";
 
 const env = { GITHUB_TOKEN: "ghp-secret" } as unknown as EgressEnv;
+
+describe("isAllowedGitHubRequest", () => {
+  it("allows read-only fetch traffic", () => {
+    expect(isAllowedGitHubRequest("GET", "/acme/widgets.git/info/refs")).toBe(true);
+    expect(isAllowedGitHubRequest("HEAD", "/acme/widgets/info/refs")).toBe(true);
+    expect(isAllowedGitHubRequest("POST", "/acme/widgets.git/git-upload-pack")).toBe(true);
+  });
+
+  it("refuses push and every other method", () => {
+    expect(isAllowedGitHubRequest("POST", "/acme/widgets.git/git-receive-pack")).toBe(false);
+    expect(isAllowedGitHubRequest("DELETE", "/acme/widgets")).toBe(false);
+    expect(isAllowedGitHubRequest("PUT", "/acme/widgets")).toBe(false);
+  });
+});
 
 describe("isWithinRepoScope", () => {
   it("matches the approved repo and its sub-paths", () => {

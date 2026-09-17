@@ -63,3 +63,30 @@ export function statusLabel(status: string): string {
 export function emptyDiffText(): string {
   return "No file changes produced";
 }
+
+export function parseRepoName(repoUrl: string): string {
+  try {
+    const url = new URL(repoUrl);
+    const parts = url.pathname.replace(/^\/+/, "").replace(/\.git$/, "").split("/");
+    if (parts.length >= 2) {
+      return `${parts[0]}/${parts[1]}`;
+    }
+    return url.pathname || repoUrl;
+  } catch {
+    return repoUrl || "unknown repository";
+  }
+}
+
+export function formatTimeAgo(timestamp: number): string {
+  if (!timestamp) return "unknown time";
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 5) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+

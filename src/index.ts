@@ -7,6 +7,7 @@ import { ContainerProxy, proxyToSandbox, type Sandbox as SandboxBinding } from "
 import { getAgentByName, routeAgentRequest } from "agents/routing";
 import { OpenCodeAgent } from "./agents/opencode-agent.js";
 import { CodingOrchestrator } from "./agents/orchestrator.js";
+import { assertLiveCodingModel } from "./coding-model.js";
 import type { Env } from "./env.js";
 import { Sandbox } from "./sandbox.js";
 import { redactSecrets, verifyGitHubWebhookSignature } from "./security.js";
@@ -14,6 +15,7 @@ import { handleSlackEvents } from "./slack-events.js";
 import { handleSlackCommand } from "./slack-routes.js";
 
 export { CodingOrchestrator, OpenCodeAgent, Sandbox, ContainerProxy };
+export { assertLiveCodingModel } from "./coding-model.js";
 
 export function getUserId(request: Request): string | null {
   const email = request.headers.get("CF-Access-Authenticated-User-Email");
@@ -24,12 +26,13 @@ export function getUserId(request: Request): string | null {
 }
 
 // Signature-authenticated paths must not sit behind Access; Slack and GitHub
-// cannot complete an Access login. Write the exemption with T7, not T12.
-export const SIGNATURE_AUTHENTICATED = ["/api/slack/", "/api/github/webhook"];
+// cannot complete an Access login. Exact paths only — a prefix would exempt
+// anything added beneath it later. Write the exemption with T7, not T12.
+export const SIGNATURE_AUTHENTICATED = ["/api/slack/events", "/api/slack/command", "/api/github/webhook"];
 
 export function isAuthenticated(request: Request, env: Env): boolean {
   const { pathname } = new URL(request.url);
-  if (SIGNATURE_AUTHENTICATED.some((p) => pathname.startsWith(p))) return true;
+  if (SIGNATURE_AUTHENTICATED.includes(pathname)) return true;
   if (!env.REQUIRE_ACCESS) return true; // opt-out for `wrangler dev`
   return request.headers.has("cf-access-authenticated-user-email");
 }
@@ -86,6 +89,7 @@ async function handleGitHubWebhook(request: Request, env: Env): Promise<Response
 
 export default {
   async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
+    assertLiveCodingModel(env);
     try {
       // proxyToSandbox only needs the Sandbox binding; adapt the type.
       const sandboxEnv = {
@@ -119,14 +123,20 @@ export default {
       if (!isAuthenticated(request, env)) {
         return Response.json({ error: "Authentication required." }, { status: 401 });
       }
-      const agentResponse = await routeAgentRequest(request, env);
+      // Only the orchestrator is reachable over /agents/*. Exposing the
+      // OpenCodeAgent and Sandbox bindings would let a client start a coding
+      // or sandbox run without passing the approval gate.
+      const agentResponse = await routeAgentRequest(request, {
+        CodingOrchestrator: env.CodingOrchestrator,
+      });
       if (agentResponse) {
         return agentResponse;
       }
       return env.ASSETS.fetch(request);
     } catch (error) {
-      const message = redactSecrets(error instanceof Error ? error.message : String(error));
-      return Response.json({ error: message }, { status: 500 });
+      // The client gets a generic 500; the redacted detail stays in the log.
+      console.error(redactSecrets(error instanceof Error ? error.message : String(error)));
+      return Response.json({ error: "Internal error." }, { status: 500 });
     }
   },
 } satisfies ExportedHandler<Env>;

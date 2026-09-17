@@ -129,6 +129,18 @@ export function isWithinRepoScope(pathname: string, allowedPath: string): boolea
 }
 
 /**
+ * The container only ever fetches. Pushing is a Worker-side REST concern, so
+ * a run that tries to push with the injected credential is refused here rather
+ * than trusted to behave.
+ */
+export function isAllowedGitHubRequest(method: string, pathname: string): boolean {
+  const verb = method.toUpperCase();
+  if (verb === "GET" || verb === "HEAD") return true;
+  if (verb !== "POST") return false;
+  return pathname.toLowerCase().endsWith("/git-upload-pack");
+}
+
+/**
  * B6: the credential is scoped to the one repo this run was approved for, so
  * repository code cannot reach every other repo the token can.
  */
@@ -147,6 +159,9 @@ export async function forwardGitHubScoped(
   }
   if (!isWithinRepoScope(target.pathname, allowedPath)) {
     return new Response("Repository outside the approved scope.", { status: 403 });
+  }
+  if (!isAllowedGitHubRequest(request.method, target.pathname)) {
+    return new Response("Only read-only repository traffic is allowed for this run.", { status: 403 });
   }
   return forwardGitHub(request, env);
 }

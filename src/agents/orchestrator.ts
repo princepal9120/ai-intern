@@ -47,7 +47,7 @@ const delegateInputSchema = z.object({
 type DelegateInput = z.infer<typeof delegateInputSchema>;
 
 const DEFAULT_ORCHESTRATOR_MODEL = "@cf/meta/llama-3.1-8b-instruct";
-const DEFAULT_CODING_MODEL = "google/gemini-2.0-flash";
+const DEFAULT_CODING_MODEL = "google/gemini-3.5-flash-lite";
 
 export class CodingOrchestrator extends Think<Env, OrchestratorState> {
   /** The orchestrator plans and delegates; it never runs shell commands. */
@@ -140,7 +140,7 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
         publishPullRequest: fullInput.publishPullRequest,
       }),
     );
-    const finish = (status: RunStatus, patch?: { summary?: string; error?: string }) => {
+    const finish = (status: RunStatus, patch?: { summary?: string; error?: string; diff?: string }) => {
       this.store.transition(runId, status, patch);
     };
     this.store.transition(runId, "running");
@@ -151,7 +151,7 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
         // type instead would mark failed runs "completed".
         const parsed = parseAgentResult(output);
         if (parsed?.status === "completed") {
-          finish("completed", { summary: output.slice(0, 4000) });
+          finish("completed", { summary: output.slice(0, 4000), diff: parsed?.diff ? parsed.diff.slice(0, 20000) : undefined });
           return output;
         }
         finish("error", {
@@ -214,3 +214,5 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
     return Response.json({ error: "Method not allowed." }, { status: 405 });
   }
 }
+
+

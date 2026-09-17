@@ -5,8 +5,78 @@ import {
   redactSecrets,
   shellJoin,
   shellQuote,
+  verifyGitHubWebhookSignature,
   InputError,
 } from "../src/security.js";
+
+async function sign(secret: string, payload: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  const hex = Array.from(new Uint8Array(mac))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return `sha256=${hex}`;
+}
+
+describe("verifyGitHubWebhookSignature", () => {
+  const SECRET = "whsec_test_secret";
+  const PAYLOAD = '{"action":"opened"}';
+
+  it("accepts a valid signature", async () => {
+    expect(
+      await verifyGitHubWebhookSignature({ secret: SECRET, payload: PAYLOAD, signature: await sign(SECRET, PAYLOAD) }),
+    ).toBe(true);
+  });
+
+  it("compares the hex digest case-insensitively", async () => {
+    const good = await sign(SECRET, PAYLOAD);
+    expect(
+      await verifyGitHubWebhookSignature({
+        secret: SECRET,
+        payload: PAYLOAD,
+        signature: `sha256=${good.slice("sha256=".length).toUpperCase()}`,
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects a wrong secret", async () => {
+    expect(
+      await verifyGitHubWebhookSignature({ secret: SECRET, payload: PAYLOAD, signature: await sign("other", PAYLOAD) }),
+    ).toBe(false);
+  });
+
+  it("rejects a tampered body", async () => {
+    expect(
+      await verifyGitHubWebhookSignature({
+        secret: SECRET,
+        payload: '{"action":"closed"}',
+        signature: await sign(SECRET, PAYLOAD),
+      }),
+    ).toBe(false);
+  });
+
+  it("rejects a missing header, a missing prefix, and an empty secret", async () => {
+    const good = await sign(SECRET, PAYLOAD);
+    expect(await verifyGitHubWebhookSignature({ secret: SECRET, payload: PAYLOAD, signature: null })).toBe(false);
+    expect(
+      await verifyGitHubWebhookSignature({ secret: SECRET, payload: PAYLOAD, signature: good.slice("sha256=".length) }),
+    ).toBe(false);
+    expect(await verifyGitHubWebhookSignature({ secret: "", payload: PAYLOAD, signature: good })).toBe(false);
+  });
+
+  it("rejects a truncated digest without throwing", async () => {
+    const good = await sign(SECRET, PAYLOAD);
+    expect(
+      await verifyGitHubWebhookSignature({ secret: SECRET, payload: PAYLOAD, signature: good.slice(0, 20) }),
+    ).toBe(false);
+  });
+});
 
 describe("parseGitHubRepoUrl", () => {
   it("accepts a canonical repository URL", () => {

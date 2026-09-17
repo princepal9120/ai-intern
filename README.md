@@ -2,7 +2,7 @@
 
 An account-owned Cloudflare coding workspace: describe a GitHub task, review the proposed delegation, approve or reject it, and inspect a sandbox-generated diff. The runtime is Cloudflare Agents + Sandbox containers running OpenCode, with a React dashboard and Astro/Starlight documentation served by one Worker.
 
-**Status: local prototype, not production-ready.** No live end-to-end cloud run is claimed. `VERIFICATION.md` records the current evidence: `pnpm typecheck`, `pnpm lint`, `pnpm test` (270/270), and `pnpm build` pass locally; `npx wrangler deploy --dry-run` fails on this machine because no Docker CLI is available to package the container image. Until a dated live run is recorded in `VERIFICATION.md` against the P2 acceptance bar in `PLAN.md` §15 (submit → approve → clone/code/collect with a diff that matches reality, rejection starting no container, honest failure exit codes, PR with deletions shown as deleted, peak memory measured), the honest status stays "local prototype".
+**Status: local prototype, not production-ready.** No live end-to-end cloud run is claimed. `VERIFICATION.md` records the current evidence: `pnpm typecheck`, `pnpm lint`, `pnpm test` (285/288, 3 require a build), and `pnpm build` pass locally; `npx wrangler deploy --dry-run` fails on this machine because no Docker CLI is available to package the container image. Until a dated live run is recorded in `VERIFICATION.md` against the P2 acceptance bar in `PLAN.md` §15 (submit → approve → clone/code/collect with a diff that matches reality, rejection starting no container, honest failure exit codes, PR with deletions shown as deleted, peak memory measured), the honest status stays "local prototype".
 
 Provider traffic is intercepted at the Sandbox egress boundary and forwarded through the account owner's AI Gateway binding — there is no provider callback route (the dead callback path was deleted; the forwarder and its route no longer exist).
 
@@ -14,7 +14,7 @@ Provider traffic is intercepted at the Sandbox egress boundary and forwarded thr
 
 1. Workers Paid plan (Durable Objects + Containers require it).
 2. An AI Gateway with a stored provider key ([BYOK](https://developers.cloudflare.com/ai-gateway/configuration/bring-your-own-keys/)) — the key never enters this repo or the container.
-3. Cloudflare Access on the Worker route, **with a bypass for `/api/slack/*` and `/api/github/webhook`** (Slack and GitHub cannot complete an Access login).
+3. Cloudflare Access on the Worker route, **with a bypass for `/api/slack/events`, `/api/slack/command`, and `/api/github/webhook`** (Slack and GitHub cannot complete an Access login). The Worker exempts exactly those paths; anything else under `/api/slack/` is still gated.
 4. `GITHUB_TOKEN` secret — required for PR publishing, so effectively required for Slack.
 5. Optional Slack app — see the Slack section below.
 
@@ -62,7 +62,7 @@ Open **http://localhost:4321/docs/** to read the built documentation with search
 
 The documentation site at /docs/ includes setup, configuration, local development, dashboard usage, deployment, GitHub integration, security, architecture, API reference, troubleshooting, cost surfaces, contributing, and an end-to-end acceptance checklist.
 
-Source entry: [docs index](docs/src/content/docs/index.md). Content lives in docs/src/content/docs/. The root build runs Vite first, builds Astro, copies docs/dist into public/docs, and verifies local links, anchors, assets, and Pagefind output.
+Source entry: [docs index](web/src/content/docs/index.md). Content lives in web/src/content/docs/docs/. The root build runs Vite first, builds Astro into web/dist, then copies web/dist into public/ and verifies local links, anchors, assets, and Pagefind output.
 
 ## Architecture
 
@@ -101,7 +101,7 @@ Model ids retire — `gemini-2.0-flash` was shut down 2026-06-01, which is why t
 
 Tokens dominate the bill — roughly 20–40× the Cloudflare compute cost — so provider choice, not container tuning, is the lever that matters. See `docs/costs`.
 
-Do not add provider credentials to the container. The container gets a dummy key (`DUMMY_PROVIDER_KEY`); the Sandbox Durable Object swaps in the real AI Gateway credential outside the container. Copy .dev.vars.example to the ignored .dev.vars for local configuration. Optional GITHUB_TOKEN is used for Worker-side publication, not private cloning. GITHUB_WEBHOOK_SECRET verifies acknowledgment-only webhook requests.
+Do not add provider credentials to the container. The container gets a dummy key (`DUMMY_PROVIDER_KEY`); the Sandbox Durable Object swaps in the real AI Gateway credential outside the container. Copy .dev.vars.example to the ignored .dev.vars for local configuration. `GITHUB_TOKEN` is attached by the Worker at the egress boundary for git traffic to the approved repo only, and is also used for Worker-side PR publishing; prefer a fine-grained token scoped to that repo. `GITHUB_WEBHOOK_SECRET` verifies acknowledgment-only webhook requests.
 
 ## Pinned versions
 

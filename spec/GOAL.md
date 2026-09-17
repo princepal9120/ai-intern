@@ -26,6 +26,9 @@ A user must be able to:
 10. See OpenCode progress, changed files, and a unified diff.
 11. Optionally request a branch and pull request when a GitHub token is configured.
 
+The dashboard is one inbound surface of two. Slack (`@ai-intern` mentions and `/ai-intern`) is a supported entry point: thread prose is turned into structured `delegate_coding_task` by the orchestrator LLM. Prose never crosses the child boundary (`parseAgentToolInput`). Slack approvals require `SLACK_APPROVERS`; an empty list means nobody can approve from Slack.
+
+
 ## Required architecture
 
 Keep the smallest working architecture. Do not add D1, KV, Queues, R2, Workflows, Hono, or a monorepo unless a concrete requirement needs one.

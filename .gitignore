@@ -1,11 +1,14 @@
 node_modules/
 public/
+!web/public/
+!web/public/**
 dist/
 .wrangler/
 .dev.vars
 wrangler-devenv.json
 .omx/
 .omc/
+**/.omc/
 
 .astro/
 .vitest/

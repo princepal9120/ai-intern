@@ -8,4 +8,4 @@ const dest = new URL('../public', import.meta.url);
 
 await mkdir(dirname(dest.pathname), { recursive: true });
 await cp(src.pathname, dest.pathname, { recursive: true });
-console.log('Copied docs/dist -> public');
+console.log('Copied web/dist -> public');

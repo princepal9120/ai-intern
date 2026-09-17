@@ -175,4 +175,66 @@ describe("publishFilesAsPullRequest", () => {
       expect(String(error)).not.toContain(SECRET);
     }
   });
+
+  it("publishes deletions as null-content tree entries", async () => {
+    const calls: RecordedCall[] = [];
+    await publishFilesAsPullRequest(
+      {
+        repoUrl: "https://github.com/owner/repo",
+        baseBranch: "main",
+        newBranch: "ai-intern/run-abc",
+        title: "AI Intern: delete",
+        body: "details",
+        files: [
+          { path: "gone.ts", content: null, encoding: "utf8" },
+          { path: "kept.ts", content: "x", encoding: "utf8" },
+        ],
+        token: SECRET,
+        message: "AI Intern: delete",
+      },
+      { fetchImpl: makeFetch(calls) },
+    );
+    // The deleted path needs no blob upload: only one blob call for kept.ts.
+    expect(calls.filter((call) => call.url.endsWith("/git/blobs"))).toHaveLength(1);
+    const treeCall = calls.find((call) => call.url.endsWith("/git/trees"));
+    const body = JSON.parse(String(treeCall?.init?.body)) as {
+      tree: Array<{ path: string; sha: string | null }>;
+    };
+    expect(body.tree).toEqual([
+      { path: "gone.ts", mode: "100644", type: "blob", sha: null },
+      { path: "kept.ts", mode: "100644", type: "blob", sha: "blob-3" },
+    ]);
+  });
+
+  it("removes the branch when the pull request cannot be created", async () => {
+    const calls: RecordedCall[] = [];
+    const base = makeFetch(calls);
+    const failingPulls = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.endsWith("/pulls")) {
+        calls.push({ url, init });
+        return new Response(JSON.stringify({ message: "pull creation refused" }), { status: 422 });
+      }
+      return base(input, init);
+    });
+    await expect(
+      publishFilesAsPullRequest(
+        {
+          repoUrl: "https://github.com/owner/repo",
+          baseBranch: "main",
+          newBranch: "ai-intern/run-abc",
+          title: "t",
+          body: "b",
+          files: [{ path: "a.ts", content: "x", encoding: "utf8" }],
+          token: SECRET,
+          message: "m",
+        },
+        { fetchImpl: failingPulls as unknown as typeof fetch },
+      ),
+    ).rejects.toThrow(/ai-intern\/run-abc was removed/);
+    const cleanup = calls.find(
+      (call) => call.init?.method === "DELETE" && call.url.includes("/git/refs/heads/ai-intern"),
+    );
+    expect(cleanup).toBeDefined();
+  });
 });

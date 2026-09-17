@@ -1,7 +1,6 @@
 /**
- * Functional AI Intern dashboard. One form starts an approval-gated
- * coding task; the conversation shows planning text, approval cards,
- * and delegated sandbox runs with OpenCode output.
+ * Complete End-to-End AI Intern Dashboard.
+ * Approval-gated coding tasks delegated to isolated Cloudflare Sandbox containers running OpenCode.
  */
 import {
   getToolApproval,
@@ -13,7 +12,12 @@ import { isToolUIPart, type UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DiffViewer } from "./components/DiffViewer";
 import { TaskForm } from "../../web/src/components/TaskForm";
-import { extractPendingApprovals, toolDisplayName } from "./ui-helpers";
+import {
+  extractPendingApprovals,
+  formatTimeAgo,
+  parseRepoName,
+  toolDisplayName,
+} from "./ui-helpers";
 
 const ORCHESTRATOR_AGENT = "coding-orchestrator";
 const ORCHESTRATOR_NAME = "default";
@@ -31,6 +35,26 @@ interface RetainedRun {
   summary?: string;
   error?: string;
   diff?: string;
+}
+
+interface ToolRunPart {
+  text?: string;
+  delta?: string;
+  message?: string;
+  body?: string;
+  [key: string]: unknown;
+}
+
+interface ToolRunRecord {
+  runId: string;
+  status: string;
+  agentType?: string;
+  parentToolCallId?: string;
+  parts: ToolRunPart[];
+  summary?: string;
+  error?: string;
+  diff?: string;
+  [key: string]: unknown;
 }
 
 function partText(part: UIMessage["parts"][number]): string | null {
@@ -63,12 +87,18 @@ function extractCompletedDiff(run: unknown): string | null {
   if (record["status"] !== "completed") return null;
   const direct = record["diff"];
   if (typeof direct === "string" && direct.trim() !== "") return direct;
+  const summary = record["summary"];
+  if (typeof summary === "string" && summary.includes("diff --git")) {
+    const start = summary.indexOf("diff --git");
+    return summary.slice(start);
+  }
   return null;
 }
 
 function useRetainedRuns(refreshToken: number): { runs: RetainedRun[]; error: string | null } {
   const [runs, setRuns] = useState<RetainedRun[]>([]);
   const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     fetch("/api/runs")
@@ -89,8 +119,28 @@ function useRetainedRuns(refreshToken: number): { runs: RetainedRun[]; error: st
       cancelled = true;
     };
   }, [refreshToken]);
+
   return { runs, error };
 }
+
+const STARTER_TEMPLATES = [
+  {
+    label: "Fix Failing Tests",
+    task: "Investigate test failures in the repository, fix the root cause, and verify all test suites pass with zero regressions.",
+  },
+  {
+    label: "Add Unit Tests",
+    task: "Identify uncovered functions in the core modules and add thorough unit test coverage with edge case tests.",
+  },
+  {
+    label: "Refactor & Clean",
+    task: "Refactor duplicate utility logic, remove unused imports and dead code, and ensure clean types across the codebase.",
+  },
+  {
+    label: "Documentation",
+    task: "Review and update README and code comments to match recent API changes and architecture decisions.",
+  },
+];
 
 export function App(): React.JSX.Element {
   const [repoUrl, setRepoUrl] = useState("");
@@ -102,6 +152,10 @@ export function App(): React.JSX.Element {
 
   const [submitting, setSubmitting] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [showClearModal, setShowClearModal] = useState(false);
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<"all" | "active" | "completed">("all");
+
   const submitFailed = useRef(false);
   const submitInFlight = useRef(false);
   const clearInFlight = useRef(false);
@@ -118,7 +172,7 @@ export function App(): React.JSX.Element {
   const { runsById } = useAgentToolEvents({ agent });
   const { runs: retainedRuns, error: runsError } = useRetainedRuns(refreshToken);
 
-  const toolRuns = useMemo(() => Object.values(runsById), [runsById]);
+  const toolRuns = useMemo(() => Object.values(runsById) as ToolRunRecord[], [runsById]);
 
   const pendingApprovals = useMemo(
     () => extractPendingApprovals(chat.messages),
@@ -191,8 +245,8 @@ export function App(): React.JSX.Element {
   }, [chat.status, chat.isStreaming, chat.messages.length, refreshRuns]);
 
   const submitTask = useCallback(
-    async (event: React.FormEvent) => {
-      event.preventDefault();
+    async (event?: React.FormEvent) => {
+      if (event) event.preventDefault();
       if (submitInFlight.current || clearInFlight.current) return;
       if (!repoUrl.trim() || !task.trim()) {
         setNotice("Enter a repository URL and a task first.");
@@ -212,7 +266,6 @@ export function App(): React.JSX.Element {
       setSubmitting(true);
       try {
         await chat.sendMessage({ text });
-        // The SDK reports transport failures through onError without rejecting.
         if (!submitFailed.current) {
           setTask((current) => current === task ? "" : current);
           refreshRuns();
@@ -227,9 +280,9 @@ export function App(): React.JSX.Element {
     [repoUrl, baseBranch, task, publishPullRequest, chat, refreshRuns],
   );
 
-  const clearAll = useCallback(async () => {
+  const confirmClearAll = useCallback(async () => {
+    setShowClearModal(false);
     if (clearInFlight.current || submitInFlight.current) return;
-    if (!window.confirm("Clear conversation history and retained runs?")) return;
     clearInFlight.current = true;
     setClearing(true);
     setNotice(null);
@@ -265,254 +318,718 @@ export function App(): React.JSX.Element {
     [refreshRuns],
   );
 
+  // Keyboard shortcut listener: Cmd/Ctrl+Enter submits, Escape closes modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        if (!submitting && repoUrl.trim() && task.trim()) {
+          e.preventDefault();
+          submitTask();
+        }
+      } else if (e.key === "Escape") {
+        setShowClearModal(false);
+        setShowShortcutsModal(false);
+      } else if (e.key === "?" && !["INPUT", "TEXTAREA"].includes((e.target as HTMLElement)?.tagName)) {
+        setShowShortcutsModal((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [submitting, repoUrl, task, submitTask]);
+
+  const activeSandboxCount = useMemo(() => {
+    return toolRuns.filter((r) => r.status === "running" || r.status === "pending").length +
+      retainedRuns.filter((r) => r.status === "running" || r.status === "pending").length;
+  }, [toolRuns, retainedRuns]);
+
   const connectionState = agent.connectionError
     ? `Connection error: ${agent.connectionError.message ?? "unknown"}`
     : agent.identified
       ? "Connected"
       : "Connecting";
+
   const busy = submitting || clearing || chat.isStreaming || chat.status === "streaming" || chat.status === "submitted";
 
+  const statusColors: Record<string, string> = {
+    completed: "text-[#4cc38a] border-[#4cc38a]/30 bg-[#4cc38a]/10",
+    running: "text-[#4f9cf0] border-[#4f9cf0]/30 bg-[#4f9cf0]/10",
+    pending: "text-[#c9a227] border-[#c9a227]/30 bg-[#c9a227]/10",
+    error: "text-[#f06666] border-[#f06666]/30 bg-[#f06666]/10",
+    aborted: "text-[#f06666] border-[#f06666]/30 bg-[#f06666]/10",
+    cancelled: "text-[#f06666] border-[#f06666]/30 bg-[#f06666]/10",
+  };
+
   return (
-    <div className="min-h-screen bg-[#0f1419] text-[#e6edf3] font-sans selection:bg-[#4f9cf0] selection:text-[#06121f] flex flex-col xl:flex-row overflow-hidden">
-      {/* SIDEBAR: Config & Task Form */}
-      <aside className="w-full xl:w-96 border-r-0 xl:border-r border-[#2a3441] bg-[#182028] flex flex-col shrink-0 h-auto xl:h-screen overflow-y-auto">
-        <div className="p-6 xl:p-8 border-b border-[#2a3441]">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-bold tracking-tight text-white">AI Intern</h1>
-            <a href="/docs/" className="text-sm text-[#4f9cf0] hover:text-[#3b82f6] font-medium transition-colors">Docs</a>
-          </div>
-          <p className="text-sm text-[#8b98a9] leading-relaxed mb-6">
-            Self-hosted on your Cloudflare account. Approval-gated coding tasks run in isolated Sandbox containers via OpenCode.
-          </p>
-          <div className="inline-flex items-center gap-2 border border-[#2a3441] bg-[#0f1419] rounded-full px-3 py-1.5 text-xs font-medium text-[#8b98a9]" role="status" aria-live="polite">
-            <span className={`w-2 h-2 rounded-full ${agent.identified && !agent.connectionError ? "bg-[#4cc38a]" : "bg-[#8b98a9]"}`} aria-hidden="true" />
-            {connectionState}
-          </div>
+    <div className="min-h-screen bg-[#0f1419] text-[#e6edf3] font-sans selection:bg-[#4f9cf0] selection:text-[#06121f] flex flex-col">
+      {/* TOP HEADER BAR */}
+      <header className="h-14 border-b border-[#2a3441] bg-[#182028] px-4 lg:px-6 flex items-center justify-between z-20 shrink-0 shadow-sm">
+        <div className="flex items-center gap-3">
+          <a href="/" className="flex items-center gap-2.5 text-white hover:opacity-90 transition-opacity">
+            <img src="/assets/mascot/shiba-avatar.png" alt="Shiba Mascot" className="w-8 h-8 rounded-lg shadow-[0_0_12px_rgba(11,159,149,0.4)] object-cover border border-teal-500/50" />
+            <div>
+              <div className="font-bold tracking-tight text-sm text-white flex items-center gap-1.5">
+                AI Software Engineer
+                <span className="text-[10px] font-mono text-teal-400 bg-teal-950/60 border border-teal-800/60 px-1.5 py-0.2 rounded">
+                  Cloudflare Native
+                </span>
+              </div>
+            </div>
+          </a>
         </div>
 
-        <div className="p-6 xl:p-8 flex-1">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-[#8b98a9] mb-5">New Coding Task</h2>
-          <TaskForm
-            repoUrl={repoUrl}
-            task={task}
-            baseBranch={baseBranch}
-            publishPullRequest={publishPullRequest}
-            busy={busy}
-            submitting={submitting}
-            clearing={clearing}
-            onRepoUrlChange={setRepoUrl}
-            onTaskChange={setTask}
-            onBaseBranchChange={setBaseBranch}
-            onPublishPullRequestChange={setPublishPullRequest}
-            onSubmit={submitTask}
-            onClear={clearAll}
-          />
-          {notice ? <p className="mt-4 text-sm text-[#8b98a9] bg-[#0f1419] p-3 rounded-lg border border-[#2a3441]">{notice}</p> : null}
-          {chat.error ? <p className="mt-4 text-sm text-[#f06666] bg-[#0f1419] p-3 rounded-lg border border-[#f06666]/30">Chat error: {chat.error.message}</p> : null}
-          {runsError ? <p className="mt-4 text-sm text-[#f06666] bg-[#0f1419] p-3 rounded-lg border border-[#f06666]/30">Runs registry: {runsError}</p> : null}
-        </div>
-      </aside>
-
-      {/* MAIN CONTENT: Conversation & Runs */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden bg-[#0f1419]">
-        {/* TOP: PENDING APPROVALS ALERT */}
-        {(pendingApprovals.length > 0 || approvalAnnouncement) ? (
-          <div className="bg-[#182028] border-b border-[#2a3441] px-6 xl:px-10 py-4 flex items-center justify-between shadow-sm z-10 shrink-0">
-             <p className="text-sm font-medium text-[#e6edf3]" role="status" aria-live="polite">
-              {pendingApprovals.length > 0
-                ? <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-[#c9a227] animate-pulse shadow-[0_0_8px_rgba(201,162,39,0.6)]"/> {pendingApprovals.length} task{pendingApprovals.length === 1 ? "" : "s"} waiting for your approval.</span>
-                : approvalAnnouncement}
-             </p>
+        <div className="flex items-center gap-3 sm:gap-4">
+          {/* Active Sandboxes Pill */}
+          <div className="hidden sm:inline-flex items-center gap-1.5 border border-[#2a3441] bg-[#0f1419] rounded-full px-2.5 py-1 text-xs font-mono text-[#8b98a9]">
+            <span className={`w-1.5 h-1.5 rounded-full ${activeSandboxCount > 0 ? "bg-[#4f9cf0] animate-pulse" : "bg-zinc-600"}`} />
+            <span>{activeSandboxCount} / 5 sandboxes active</span>
           </div>
-        ) : null}
 
-        <div className="flex-1 overflow-y-auto p-6 xl:p-10 flex flex-col xl:flex-row gap-8 xl:gap-12">
-            
-            {/* CONVERSATION AREA */}
-            <section className="flex-1 min-w-0 flex flex-col gap-6" aria-label="Conversation">
-                <div className="flex items-center justify-between border-b border-[#2a3441] pb-3">
-                    <h2 className="text-lg font-semibold text-white">Conversation</h2>
-                </div>
-                
-                {chat.messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-48 border border-dashed border-[#2a3441] rounded-xl bg-[#182028]/50">
-                    <p className="text-[#8b98a9] text-sm">No messages yet. Submit a task to start.</p>
-                  </div>
-                ) : (
-                  <ol className="flex flex-col gap-6">
-                    {chat.messages.map((message) => (
-                      <li key={message.id} className={`flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
-                        <div className="text-xs font-semibold text-[#8b98a9] uppercase tracking-wider mb-1.5 px-1">{message.role === "user" ? "You" : "AI Intern"}</div>
-                        <div className={`flex flex-col gap-2 max-w-[90%] md:max-w-[80%] ${message.role === 'user' ? 'bg-[#4f9cf0] text-[#06121f] rounded-2xl rounded-tr-sm p-4' : 'bg-[#182028] border border-[#2a3441] text-[#e6edf3] rounded-2xl rounded-tl-sm p-4'}`}>
-                            {message.parts.map((part, index) => {
-                                const text = partText(part);
-                                if (text !== null) {
-                                  return (
-                                    <pre key={index} className="whitespace-pre-wrap font-sans text-sm break-words">
-                                      {text}
-                                    </pre>
-                                  );
-                                }
-                                if (isToolUIPart(part)) {
-                                  const state = getToolPartState(part);
-                                  const approval = getToolApproval(part);
-                                  return (
-                                    <div key={index} className="flex flex-wrap items-center gap-2 mt-2 bg-[#0f1419]/50 p-2 rounded-lg border border-[#2a3441]/50">
-                                      <span className="font-mono text-xs bg-[#2a3441] text-gray-200 rounded px-2 py-1">{toolDisplayName(part)}</span>
-                                      <span className={`text-xs font-medium ${approval?.approved === false ? 'text-[#f06666]' : 'text-[#8b98a9]'}`}>{approval?.approved === false ? "Rejected" : state}</span>
-                                    </div>
-                                  );
-                                }
-                                return null;
-                            })}
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                )}
+          {/* Connection Status */}
+          <div
+            className="inline-flex items-center gap-2 border border-[#2a3441] bg-[#0f1419] rounded-full px-3 py-1 text-xs font-medium text-[#8b98a9]"
+            role="status"
+            aria-live="polite"
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                agent.connectionError
+                  ? "bg-[#f06666]"
+                  : agent.identified
+                  ? "bg-[#4cc38a] shadow-[0_0_8px_rgba(76,195,138,0.5)]"
+                  : "bg-[#c9a227] animate-pulse"
+              }`}
+              aria-hidden="true"
+            />
+            <span className="truncate max-w-[140px] sm:max-w-none">{connectionState}</span>
+          </div>
 
+          {/* Shortcuts & Help */}
+          <button
+            type="button"
+            onClick={() => setShowShortcutsModal(true)}
+            className="w-8 h-8 rounded-lg border border-[#2a3441] bg-[#0f1419] hover:bg-[#2a3441] text-[#8b98a9] hover:text-white flex items-center justify-center text-xs font-mono transition-colors"
+            title="Keyboard shortcuts (?)"
+            aria-label="Keyboard shortcuts"
+          >
+            ?
+          </button>
+
+          {/* Links */}
+          <a
+            href="/docs/"
+            className="text-xs text-[#4f9cf0] hover:text-[#3b82f6] font-medium transition-colors border border-[#2a3441] px-2.5 py-1 rounded-md bg-[#0f1419]"
+          >
+            Docs
+          </a>
+        </div>
+      </header>
+
+      <div className="flex-1 flex flex-col xl:flex-row overflow-hidden">
+        {/* SIDEBAR: Config & Task Form */}
+        <aside className="w-full xl:w-96 border-r-0 xl:border-r border-[#2a3441] bg-[#182028] flex flex-col shrink-0 h-auto xl:h-[calc(100vh-3.5rem)] overflow-y-auto">
+          <div className="p-5 xl:p-6 border-b border-[#2a3441]">
+            <div className="flex items-center justify-between mb-2">
+              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                <img src="/assets/mascot/shiba-avatar.png" alt="Mascot" className="w-6 h-6 rounded-md object-cover border border-teal-500/40" />
+                New Coding Task
+              </h1>
+              <span className="text-[11px] font-mono text-[#8b98a9]">v0.1.0</span>
+            </div>
+            <p className="text-xs text-[#8b98a9] leading-relaxed mb-3">
+              Self-hosted on your Cloudflare account. AI Software Engineer plans tasks, delegates to isolated Sandbox micro-containers, and awaits your approval.
+            </p>
+
+            {/* Quick Starter Templates */}
+            <div className="mt-3">
+              <div className="text-[11px] font-semibold text-[#8b98a9] uppercase tracking-wider mb-2">
+                Quick Starters
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {STARTER_TEMPLATES.map((tmpl) => (
+                  <button
+                    key={tmpl.label}
+                    type="button"
+                    onClick={() => {
+                      setTask(tmpl.task);
+                      if (!repoUrl) setRepoUrl("https://github.com/cloudflare/ai-chat");
+                    }}
+                    className="text-left text-[11px] px-2 py-1.5 rounded bg-[#0f1419] hover:bg-[#2a3441] text-[#e6edf3] border border-[#2a3441] transition-colors truncate"
+                  >
+                    {tmpl.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-5 xl:p-6 flex-1 flex flex-col gap-4">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-[#8b98a9]">New Coding Task</h2>
+
+            <TaskForm
+              repoUrl={repoUrl}
+              task={task}
+              baseBranch={baseBranch}
+              publishPullRequest={publishPullRequest}
+              busy={busy}
+              submitting={submitting}
+              clearing={clearing}
+              onRepoUrlChange={setRepoUrl}
+              onTaskChange={setTask}
+              onBaseBranchChange={setBaseBranch}
+              onPublishPullRequestChange={setPublishPullRequest}
+              onSubmit={submitTask}
+              onClear={() => setShowClearModal(true)}
+            />
+
+            <div className="text-[11px] text-[#8b98a9] text-center pt-1 font-mono">
+              Tip: Press <kbd className="bg-[#0f1419] px-1 py-0.5 rounded border border-[#2a3441]">⌘</kbd> + <kbd className="bg-[#0f1419] px-1 py-0.5 rounded border border-[#2a3441]">Enter</kbd> to submit
+            </div>
+
+            {notice ? (
+              <div className="text-xs text-[#8b98a9] bg-[#0f1419] p-3 rounded-lg border border-[#2a3441] flex items-start gap-2">
+                <svg className="w-4 h-4 text-[#4f9cf0] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="break-words">{notice}</div>
+              </div>
+            ) : null}
+
+            {chat.error ? (
+              <div className="text-xs text-[#f06666] bg-[#f06666]/10 p-3 rounded-lg border border-[#f06666]/30 flex items-start gap-2">
+                <svg className="w-4 h-4 text-[#f06666] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div className="break-words">Chat error: {chat.error.message}</div>
+              </div>
+            ) : null}
+
+            {runsError ? (
+              <div className="text-xs text-[#f06666] bg-[#f06666]/10 p-3 rounded-lg border border-[#f06666]/30 flex items-start gap-2">
+                <svg className="w-4 h-4 text-[#f06666] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="break-words">Runs registry: {runsError}</div>
+              </div>
+            ) : null}
+
+            {/* Architecture Info Pill */}
+            <div className="mt-auto pt-4 border-t border-[#2a3441] flex flex-col gap-1.5 text-[11px] text-[#8b98a9] font-mono">
+              <div className="flex items-center justify-between">
+                <span>Orchestrator:</span>
+                <span className="text-[#e6edf3]">Think (Llama 3.1)</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Coding Engine:</span>
+                <span className="text-[#e6edf3]">OpenCode (Gemini)</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Isolation:</span>
+                <span className="text-[#4cc38a]">Cloudflare Sandbox</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        {/* MAIN CONTENT: Conversation & Runs */}
+        <main className="flex-1 flex flex-col h-auto xl:h-[calc(100vh-3.5rem)] overflow-hidden bg-[#0f1419]">
+          {/* TOP: PENDING APPROVALS ALERT */}
+          {(pendingApprovals.length > 0 || approvalAnnouncement) ? (
+            <div className="bg-[#182028] border-b border-[#2a3441] px-6 xl:px-8 py-3.5 flex items-center justify-between shadow-sm z-10 shrink-0">
+              <p className="text-sm font-medium text-[#e6edf3]" role="status" aria-live="polite">
                 {pendingApprovals.length > 0 ? (
-                  <div className="mt-4 border-t border-[#2a3441] pt-6 flex flex-col gap-4" role="group" aria-label="Pending approvals">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#c9a227]">Waiting for your approval</h3>
-                    {pendingApprovals.map((approval) => (
-                      <div key={approval.approvalId} className="border border-[#c9a227]/50 bg-[#182028] rounded-xl p-5 shadow-lg shadow-[#c9a227]/5">
-                        <div className="font-mono font-bold text-sm text-[#e6edf3] mb-3">{approval.tool}</div>
-                        <pre className="whitespace-pre-wrap font-mono text-xs text-[#8b98a9] bg-[#0f1419] p-3 rounded-lg border border-[#2a3441] max-h-56 overflow-auto mb-4">
-                          {typeof approval.input === "string" ? approval.input : JSON.stringify(approval.input, null, 2)}
-                        </pre>
-                        <p className="text-xs text-[#8b98a9] mb-4">
-                          Approving starts an isolated sandbox run. Rejecting stops the tool call.
-                        </p>
-                        <div className="flex gap-3">
-                          <button
-                            type="button"
-                            className="bg-[#4cc38a] hover:bg-[#3ba875] text-[#06121f] font-semibold py-2 px-5 rounded-lg transition-colors disabled:opacity-50 text-sm shadow-sm"
-                            disabled={decisions[approval.approvalId] !== undefined}
-                            onClick={() => decideApproval(approval.approvalId, true)}
-                          >
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            className="bg-transparent border border-[#f06666] text-[#f06666] hover:bg-[#f06666]/10 font-semibold py-2 px-5 rounded-lg transition-colors disabled:opacity-50 text-sm"
-                            disabled={decisions[approval.approvalId] !== undefined}
-                            onClick={() => decideApproval(approval.approvalId, false)}
-                          >
-                            Reject
-                          </button>
-                        </div>
+                  <span className="flex items-center gap-2 text-[#c9a227]">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#c9a227] animate-pulse shadow-[0_0_8px_rgba(201,162,39,0.6)]" />
+                    {pendingApprovals.length} task{pendingApprovals.length === 1 ? "" : "s"} waiting for your approval.
+                  </span>
+                ) : (
+                  <span className="text-[#4cc38a] flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {approvalAnnouncement}
+                  </span>
+                )}
+              </p>
+            </div>
+          ) : null}
+
+          <div className="flex-1 overflow-y-auto p-5 xl:p-8 flex flex-col xl:flex-row gap-6 xl:gap-8">
+            {/* CONVERSATION AREA */}
+            <section className="flex-1 min-w-0 flex flex-col gap-5" aria-label="Conversation">
+              <div className="flex items-center justify-between border-b border-[#2a3441] pb-3">
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-base font-semibold text-white">Conversation</h2>
+                  {chat.messages.length > 0 ? (
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#182028] border border-[#2a3441] text-[#8b98a9]">
+                      {chat.messages.length} message{chat.messages.length === 1 ? "" : "s"}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+
+              {chat.messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 border border-dashed border-[#2a3441] rounded-xl bg-[#182028]/40 px-6 text-center">
+                  <img src="/assets/mascot/shiba-puppy.png" alt="Shiba puppy mascot" className="w-48 h-auto max-h-36 rounded-xl shadow-lg border border-teal-500/30 mb-3 object-cover transition-transform hover:scale-105" />
+                  <p className="text-[#8b98a9] text-sm mb-2 font-medium">No messages yet. Submit a task to start.</p>
+                  <p className="text-xs text-[#8b98a9]/70 max-w-sm">
+                    AI Software Engineer is ready. Enter a repository and describe the changes you want.
+                  </p>
+                </div>
+              ) : (
+                <ol className="flex flex-col gap-5">
+                  {chat.messages.map((message) => (
+                    <li key={message.id} className={`flex flex-col ${message.role === "user" ? "items-end" : "items-start"}`}>
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-[#8b98a9] uppercase tracking-wider mb-1 px-1">
+                        {message.role === "user" ? (
+                          <>
+                            <span>You</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#4f9cf0]" />
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <img src="/assets/mascot/shiba-avatar.png" alt="Shiba" className="w-4 h-4 rounded-full object-cover border border-teal-500/40 shadow-sm" />
+                            <span className="text-teal-400 font-bold">AI Software Engineer</span>
+                          </div>
+                        )}
                       </div>
-                    ))}
+                      <div
+                        className={`flex flex-col gap-2 max-w-[92%] md:max-w-[85%] ${
+                          message.role === "user"
+                            ? "bg-[#4f9cf0] text-[#06121f] rounded-2xl rounded-tr-sm p-4 font-medium shadow-sm"
+                            : "bg-[#182028] border border-[#2a3441] text-[#e6edf3] rounded-2xl rounded-tl-sm p-4 shadow-sm"
+                        }`}
+                      >
+                        {message.parts.map((part, index) => {
+                          const text = partText(part);
+                          if (text !== null) {
+                            return (
+                              <pre key={index} className="whitespace-pre-wrap font-sans text-sm break-words leading-relaxed">
+                                {text}
+                              </pre>
+                            );
+                          }
+                          if (isToolUIPart(part)) {
+                            const state = getToolPartState(part);
+                            const approval = getToolApproval(part);
+                            return (
+                              <div
+                                key={index}
+                                className="flex flex-wrap items-center gap-2 mt-2 bg-[#0f1419]/70 p-2.5 rounded-lg border border-[#2a3441]/60 font-mono text-xs"
+                              >
+                                <span className="text-teal-400 font-semibold bg-[#2a3441]/60 px-2 py-0.5 rounded">
+                                  {toolDisplayName(part)}
+                                </span>
+                                <span
+                                  className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                                    approval?.approved === false
+                                      ? "text-[#f06666] border-[#f06666]/30 bg-[#f06666]/10"
+                                      : state === "waiting-approval"
+                                      ? "text-[#c9a227] border-[#c9a227]/30 bg-[#c9a227]/10 animate-pulse"
+                                      : "text-[#8b98a9] border-[#2a3441] bg-[#182028]"
+                                  }`}
+                                >
+                                  {approval?.approved === false ? "Rejected" : state}
+                                </span>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })}
+                      </div>
+                    </li>
+                  ))}
+
+                  {/* Streaming indicator */}
+                  {(chat.isStreaming || chat.status === "streaming") ? (
+                    <li className="flex flex-col items-start">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-teal-400 mb-1 px-1">
+                        <img src="/assets/mascot/shiba-avatar.png" alt="Shiba" className="w-4 h-4 rounded-full object-cover border border-teal-500/40 shadow-sm animate-bounce" />
+                        AI Software Engineer is reasoning...
+                      </div>
+                      <div className="bg-[#182028] border border-[#2a3441] rounded-2xl rounded-tl-sm p-4 text-xs text-[#8b98a9] flex items-center gap-2">
+                        <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-teal-400 border-t-transparent rounded-full" />
+                        <span>Planning coding execution in sandbox</span>
+                      </div>
+                    </li>
+                  ) : null}
+                </ol>
+              )}
+
+              {/* PENDING APPROVALS CARDS */}
+              {pendingApprovals.length > 0 ? (
+                <div className="mt-4 border-t border-[#2a3441] pt-5 flex flex-col gap-4" role="group" aria-label="Pending approvals">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#c9a227] flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-[#c9a227] animate-pulse" />
+                      Waiting for your approval
+                    </h3>
+                    <span className="text-[11px] text-[#8b98a9] font-mono">Approval Gate 1</span>
                   </div>
-                ) : null}
+
+                  {pendingApprovals.map((approval) => (
+                    <div
+                      key={approval.approvalId}
+                      className="border border-[#c9a227]/60 bg-[#182028] rounded-xl p-5 shadow-lg shadow-[#c9a227]/5 flex flex-col gap-3"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="font-mono font-bold text-sm text-[#e6edf3] flex items-center gap-2">
+                          <img src="/assets/mascot/shiba-avatar.png" alt="Shiba Guard" className="w-5 h-5 rounded-full object-cover border border-amber-500/50" />
+                          {approval.tool}
+                        </div>
+                        <span className="text-[10px] uppercase tracking-wider font-bold bg-[#c9a227]/15 border border-[#c9a227]/30 text-[#c9a227] px-2 py-0.5 rounded-full">
+                          Action Required
+                        </span>
+                      </div>
+
+                      <pre className="whitespace-pre-wrap font-mono text-xs text-[#8b98a9] bg-[#0f1419] p-3 rounded-lg border border-[#2a3441] max-h-56 overflow-auto mb-1">
+                        {typeof approval.input === "string" ? approval.input : JSON.stringify(approval.input, null, 2)}
+                      </pre>
+
+                      <p className="text-xs text-[#8b98a9] leading-relaxed">
+                        Approving starts an isolated sandbox run. Rejecting stops the tool call.
+                      </p>
+
+                      <div className="flex items-center gap-3 pt-1">
+                        <button
+                          type="button"
+                          className="bg-[#4cc38a] hover:bg-[#3ba875] text-[#06121f] font-semibold py-2 px-5 rounded-lg transition-colors disabled:opacity-50 text-sm shadow-sm flex items-center gap-1.5"
+                          disabled={decisions[approval.approvalId] !== undefined}
+                          onClick={() => decideApproval(approval.approvalId, true)}
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span>Approve</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="bg-transparent border border-[#f06666] text-[#f06666] hover:bg-[#f06666]/10 font-semibold py-2 px-5 rounded-lg transition-colors disabled:opacity-50 text-sm flex items-center gap-1.5"
+                          disabled={decisions[approval.approvalId] !== undefined}
+                          onClick={() => decideApproval(approval.approvalId, false)}
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          <span>Reject</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </section>
 
             {/* RUNS AREA */}
-            <section className="flex-1 min-w-0 flex flex-col gap-6" aria-label="Delegated runs">
-                <div className="flex items-center justify-between border-b border-[#2a3441] pb-3">
-                    <h2 className="text-lg font-semibold text-white">Delegated Runs</h2>
-                    <button type="button" className="text-xs bg-[#182028] hover:bg-[#2a3441] border border-[#2a3441] text-[#e6edf3] font-medium py-1.5 px-3 rounded-md transition-colors" onClick={refreshRuns}>
-                      Refresh
+            <section className="flex-1 min-w-0 flex flex-col gap-5" aria-label="Delegated runs">
+              <div className="flex items-center justify-between border-b border-[#2a3441] pb-3">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-base font-semibold text-white">Delegated Runs</h2>
+                  {/* Status filter tabs */}
+                  <div className="hidden sm:flex items-center gap-1 bg-[#0f1419] p-0.5 rounded-lg border border-[#2a3441] text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("all")}
+                      className={`px-2.5 py-1 rounded-md transition-colors ${
+                        activeTab === "all" ? "bg-[#2a3441] text-white font-medium" : "text-[#8b98a9] hover:text-white"
+                      }`}
+                    >
+                      All
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("active")}
+                      className={`px-2.5 py-1 rounded-md transition-colors ${
+                        activeTab === "active" ? "bg-[#2a3441] text-white font-medium" : "text-[#8b98a9] hover:text-white"
+                      }`}
+                    >
+                      Active
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("completed")}
+                      className={`px-2.5 py-1 rounded-md transition-colors ${
+                        activeTab === "completed" ? "bg-[#2a3441] text-white font-medium" : "text-[#8b98a9] hover:text-white"
+                      }`}
+                    >
+                      Completed
+                    </button>
+                  </div>
                 </div>
-                
-                {toolRuns.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-24 border border-dashed border-[#2a3441] rounded-xl bg-[#182028]/50">
-                      <p className="text-[#8b98a9] text-sm">No live runs. Approved tasks appear here while they execute.</p>
-                    </div>
-                ) : (
-                  <ol className="flex flex-col gap-4">
-                    {toolRuns.map((run) => {
+
+                <button
+                  type="button"
+                  className="text-xs bg-[#182028] hover:bg-[#2a3441] border border-[#2a3441] text-[#e6edf3] font-medium py-1.5 px-3 rounded-md transition-colors flex items-center gap-1.5"
+                  onClick={refreshRuns}
+                  title="Refresh runs"
+                >
+                  <svg className="w-3.5 h-3.5 text-[#8b98a9]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>Refresh</span>
+                </button>
+              </div>
+
+              {/* LIVE RUNS LIST */}
+              {toolRuns.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 border border-dashed border-[#2a3441] rounded-xl bg-[#182028]/40 px-4 text-center">
+                  <p className="text-[#8b98a9] text-sm">No live runs. Approved tasks appear here while they execute.</p>
+                </div>
+              ) : (
+                <ol className="flex flex-col gap-4">
+                  {toolRuns
+                    .filter((run) => {
+                      if (activeTab === "active") return run.status === "running" || run.status === "pending";
+                      if (activeTab === "completed") return run.status === "completed";
+                      return true;
+                    })
+                    .map((run) => {
                       const completedDiff = extractCompletedDiff(run);
-                      const statusColors: Record<string, string> = {
-                        completed: "text-[#4cc38a] border-[#4cc38a]/30 bg-[#4cc38a]/10",
-                        running: "text-[#4f9cf0] border-[#4f9cf0]/30 bg-[#4f9cf0]/10",
-                        pending: "text-[#c9a227] border-[#c9a227]/30 bg-[#c9a227]/10",
-                        error: "text-[#f06666] border-[#f06666]/30 bg-[#f06666]/10",
-                        aborted: "text-[#f06666] border-[#f06666]/30 bg-[#f06666]/10",
-                        cancelled: "text-[#f06666] border-[#f06666]/30 bg-[#f06666]/10"
-                      };
                       const sColor = statusColors[run.status] || "text-[#8b98a9] border-[#2a3441] bg-[#182028]";
-                      
+
                       return (
                         <li key={run.runId} className="border border-[#2a3441] rounded-xl p-4 bg-[#182028] shadow-sm">
                           <div className="flex items-start justify-between gap-3 mb-2">
-                            <span className="font-mono text-xs text-[#e6edf3] break-all">{run.runId}</span>
-                            <span className={`text-[10px] font-bold uppercase tracking-wider border rounded-full px-2 py-0.5 shrink-0 ${sColor}`}>{run.status}</span>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="w-2 h-2 rounded-full bg-teal-400" />
+                              <span className="font-mono text-xs text-[#e6edf3] break-all">{run.runId}</span>
+                            </div>
+                            <span className={`text-[10px] font-bold uppercase tracking-wider border rounded-full px-2 py-0.5 shrink-0 ${sColor}`}>
+                              {run.status}
+                            </span>
                           </div>
-                          <div className="text-xs text-[#8b98a9] mb-3">
-                            {run.agentType}
-                            {run.parentToolCallId ? ` · tool call ${run.parentToolCallId}` : ""}
+
+                          <div className="text-xs text-[#8b98a9] mb-3 font-mono flex flex-wrap gap-x-2">
+                            <span>{run.agentType}</span>
+                            {run.parentToolCallId ? <span>· tool call {run.parentToolCallId}</span> : null}
                           </div>
+
+                          {/* Terminal Output Parts */}
                           {run.parts.length > 0 ? (
                             <pre className="font-mono text-xs text-[#8b98a9] bg-[#0f1419] p-3 rounded-lg border border-[#2a3441] max-h-40 overflow-auto whitespace-pre-wrap break-words mb-3">
                               {run.parts.map(runPartText).join("\n")}
                             </pre>
                           ) : null}
-                          {run.summary ? <pre className="font-mono text-xs text-[#e6edf3] bg-[#0f1419] p-3 rounded-lg border border-[#2a3441] max-h-40 overflow-auto whitespace-pre-wrap break-words mb-3">{run.summary}</pre> : null}
-                          {run.error ? <p className="text-xs text-[#f06666] bg-[#f06666]/10 p-3 rounded-lg border border-[#f06666]/20 mb-3">{run.error}</p> : null}
-                          {run.status === "completed" && completedDiff ? (
-                            <div className="mt-3"><DiffViewer diff={completedDiff} runId={run.runId} /></div>
+
+                          {run.summary ? (
+                            <pre className="font-mono text-xs text-[#e6edf3] bg-[#0f1419] p-3 rounded-lg border border-[#2a3441] max-h-40 overflow-auto whitespace-pre-wrap break-words mb-3">
+                              {run.summary}
+                            </pre>
                           ) : null}
+
+                          {run.error ? (
+                            <p className="text-xs text-[#f06666] bg-[#f06666]/10 p-3 rounded-lg border border-[#f06666]/20 mb-3">
+                              {run.error}
+                            </p>
+                          ) : null}
+
+                          {run.status === "completed" && completedDiff ? (
+                            <div className="mt-3">
+                              <DiffViewer diff={completedDiff} runId={run.runId} />
+                            </div>
+                          ) : null}
+
                           {run.status === "completed" && !completedDiff ? (
                             <p className="text-xs text-[#8b98a9] italic">No file changes produced</p>
                           ) : null}
                         </li>
                       );
                     })}
-                  </ol>
-                )}
+                </ol>
+              )}
 
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#8b98a9] mt-4 border-t border-[#2a3441] pt-6">Retained Runs</h3>
-                {retainedRuns.length === 0 ? (
-                  <p className="text-[#8b98a9] text-sm">No retained runs on the orchestrator yet.</p>
-                ) : (
-                  <ol className="flex flex-col gap-3">
-                    {retainedRuns.map((run) => {
-                      const statusColors: Record<string, string> = {
-                        completed: "text-[#4cc38a] border-[#4cc38a]/30 bg-[#4cc38a]/10",
-                        running: "text-[#4f9cf0] border-[#4f9cf0]/30 bg-[#4f9cf0]/10",
-                        pending: "text-[#c9a227] border-[#c9a227]/30 bg-[#c9a227]/10",
-                        error: "text-[#f06666] border-[#f06666]/30 bg-[#f06666]/10",
-                      };
+              {/* RETAINED RUNS SECTION */}
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#8b98a9] mt-4 border-t border-[#2a3441] pt-6 flex items-center justify-between">
+                <span>Retained Runs</span>
+                {retainedRuns.length > 0 ? (
+                  <span className="text-[11px] font-mono lowercase">{retainedRuns.length} total</span>
+                ) : null}
+              </h3>
+
+              {retainedRuns.length === 0 ? (
+                <p className="text-[#8b98a9] text-sm">No retained runs on the orchestrator yet.</p>
+              ) : (
+                <ol className="flex flex-col gap-3">
+                  {retainedRuns
+                    .filter((run) => {
+                      if (activeTab === "active") return run.status === "running" || run.status === "pending";
+                      if (activeTab === "completed") return run.status === "completed";
+                      return true;
+                    })
+                    .map((run) => {
                       const sColor = statusColors[run.status] || "text-[#8b98a9] border-[#2a3441] bg-[#182028]";
-                      
+                      const repoName = parseRepoName(run.repoUrl);
+
                       return (
                         <li key={run.runId} className="border border-[#2a3441] rounded-xl bg-[#182028] overflow-hidden">
                           <details className="group">
-                            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-[#2a3441]/30 transition-colors select-none" aria-label={`${run.task} — ${run.repoUrl} — ${run.status}`}>
+                            <summary
+                              className="flex items-center justify-between p-4 cursor-pointer hover:bg-[#2a3441]/30 transition-colors select-none"
+                              aria-label={`${run.task} — ${run.repoUrl} — ${run.status}`}
+                            >
                               <div className="flex items-center gap-3 overflow-hidden">
-                                <svg className="w-4 h-4 text-[#8b98a9] transform group-open:rotate-90 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                                <span className="font-mono text-xs text-[#e6edf3] truncate">{run.repoUrl}</span>
+                                <svg
+                                  className="w-4 h-4 text-[#8b98a9] transform group-open:rotate-90 transition-transform shrink-0"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                                <span className="font-mono text-xs text-[#e6edf3] truncate font-medium">
+                                  {repoName}
+                                </span>
+                                <span className="hidden sm:inline-block text-[11px] text-[#8b98a9] font-mono">
+                                  {formatTimeAgo(run.createdAt)}
+                                </span>
                               </div>
-                              <span className={`text-[10px] font-bold uppercase tracking-wider border rounded-full px-2 py-0.5 shrink-0 ml-3 ${sColor}`}>{run.status}</span>
+                              <span className={`text-[10px] font-bold uppercase tracking-wider border rounded-full px-2 py-0.5 shrink-0 ml-3 ${sColor}`}>
+                                {run.status}
+                              </span>
                             </summary>
+
                             <div className="p-4 pt-0 border-t border-[#2a3441]/50 mt-1 flex flex-col gap-3">
-                              <div className="text-[11px] text-[#8b98a9] font-mono">
-                                {run.sandboxId} · {run.baseBranch}
-                                {run.publishPullRequest ? " · pull request requested" : ""}
+                              <div className="text-[11px] text-[#8b98a9] font-mono flex flex-wrap gap-x-3 gap-y-1">
+                                <span>Sandbox: {run.sandboxId}</span>
+                                <span>Branch: {run.baseBranch}</span>
+                                {run.publishPullRequest ? (
+                                  <span className="text-teal-400">· pull request requested</span>
+                                ) : null}
                               </div>
-                              <pre className="font-sans text-sm text-[#e6edf3] whitespace-pre-wrap break-words">{run.task}</pre>
-                              {run.summary ? <pre className="font-mono text-xs text-[#e6edf3] bg-[#0f1419] p-3 rounded-lg border border-[#2a3441] whitespace-pre-wrap break-words max-h-40 overflow-auto">{run.summary}</pre> : null}
-                              {run.error ? <p className="text-xs text-[#f06666] bg-[#f06666]/10 p-3 rounded-lg border border-[#f06666]/20">{run.error}</p> : null}
+
+                              <pre className="font-sans text-sm text-[#e6edf3] whitespace-pre-wrap break-words bg-[#0f1419]/40 p-2.5 rounded-lg border border-[#2a3441]/50">
+                                {run.task}
+                              </pre>
+
+                              {run.summary ? (
+                                <pre className="font-mono text-xs text-[#e6edf3] bg-[#0f1419] p-3 rounded-lg border border-[#2a3441] whitespace-pre-wrap break-words max-h-40 overflow-auto">
+                                  {run.summary}
+                                </pre>
+                              ) : null}
+
+                              {run.error ? (
+                                <p className="text-xs text-[#f06666] bg-[#f06666]/10 p-3 rounded-lg border border-[#f06666]/20">
+                                  {run.error}
+                                </p>
+                              ) : null}
+
                               {run.status === "completed" && run.diff ? (
                                 <DiffViewer diff={run.diff} runId={run.runId} />
                               ) : null}
-                              {(run.status === "pending" || run.status === "running") ? (
-                                <button type="button" className="self-start text-xs bg-transparent border border-[#f06666] hover:bg-[#f06666]/10 text-[#f06666] font-medium py-1.5 px-3 rounded-md transition-colors mt-2" onClick={() => cancelRun(run.runId)}>
-                                  Cancel run
+
+                              <div className="flex items-center gap-2 pt-1">
+                                {(run.status === "pending" || run.status === "running") ? (
+                                  <button
+                                    type="button"
+                                    className="text-xs bg-transparent border border-[#f06666] hover:bg-[#f06666]/10 text-[#f06666] font-medium py-1.5 px-3 rounded-md transition-colors"
+                                    onClick={() => cancelRun(run.runId)}
+                                  >
+                                    Cancel run
+                                  </button>
+                                ) : null}
+
+                                <button
+                                  type="button"
+                                  className="text-xs bg-[#0f1419] hover:bg-[#2a3441] border border-[#2a3441] text-[#8b98a9] hover:text-[#e6edf3] font-medium py-1.5 px-3 rounded-md transition-colors"
+                                  onClick={() => {
+                                    setRepoUrl(run.repoUrl);
+                                    setBaseBranch(run.baseBranch);
+                                    setTask(run.task);
+                                    setPublishPullRequest(run.publishPullRequest);
+                                  }}
+                                >
+                                  Reuse parameters
                                 </button>
-                              ) : null}
+                              </div>
                             </div>
                           </details>
                         </li>
-                      )
+                      );
                     })}
-                  </ol>
-                )}
+                </ol>
+              )}
             </section>
+          </div>
+        </main>
+      </div>
+
+      {/* CLEAR HISTORY CONFIRMATION MODAL */}
+      {showClearModal ? (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#182028] border border-[#2a3441] rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-2">Clear Conversation & Runs?</h3>
+            <p className="text-sm text-[#8b98a9] mb-5 leading-relaxed">
+              This will erase all active conversation history and delete retained run registry records on the orchestrator. Active sandboxes will not be destroyed automatically.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                className="px-4 py-2 rounded-lg text-sm font-medium text-[#8b98a9] hover:text-white bg-[#0f1419] border border-[#2a3441] transition-colors"
+                onClick={() => setShowClearModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-[#f06666] hover:bg-[#d85555] transition-colors shadow-sm"
+                onClick={confirmClearAll}
+              >
+                Yes, Clear History
+              </button>
+            </div>
+          </div>
         </div>
-      </main>
+      ) : null}
+
+      {/* KEYBOARD SHORTCUTS MODAL */}
+      {showShortcutsModal ? (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#182028] border border-[#2a3441] rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-white">Keyboard Shortcuts</h3>
+              <button
+                type="button"
+                onClick={() => setShowShortcutsModal(false)}
+                className="text-[#8b98a9] hover:text-white text-sm font-mono"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex flex-col gap-2.5 text-xs">
+              <div className="flex items-center justify-between py-1.5 border-b border-[#2a3441]">
+                <span className="text-[#8b98a9]">Submit Task</span>
+                <span className="font-mono bg-[#0f1419] border border-[#2a3441] px-2 py-0.5 rounded text-[#e6edf3]">
+                  ⌘ / Ctrl + Enter
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-[#2a3441]">
+                <span className="text-[#8b98a9]">Close Modals</span>
+                <span className="font-mono bg-[#0f1419] border border-[#2a3441] px-2 py-0.5 rounded text-[#e6edf3]">
+                  Escape
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-[#2a3441]">
+                <span className="text-[#8b98a9]">Open Shortcuts Guide</span>
+                <span className="font-mono bg-[#0f1419] border border-[#2a3441] px-2 py-0.5 rounded text-[#e6edf3]">
+                  ?
+                </span>
+              </div>
+            </div>
+            <div className="mt-5 text-right">
+              <button
+                type="button"
+                className="px-4 py-1.5 rounded-lg text-xs font-medium text-[#e6edf3] bg-[#0f1419] border border-[#2a3441] hover:bg-[#2a3441] transition-colors"
+                onClick={() => setShowShortcutsModal(false)}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
+
+
+
+

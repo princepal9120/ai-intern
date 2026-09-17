@@ -8,7 +8,7 @@
 |-------|--------|
 | `pnpm typecheck` | PASS |
 | `pnpm lint` | PASS |
-| `pnpm test` | PASS (270/270 across 21 files) |
+| `pnpm test` | PASS (285/288 across 22 files; 3 skip without `pnpm build` output) |
 | `pnpm build` | PASS |
 | `npx wrangler deploy --dry-run` | **FAIL: Docker CLI not available on this machine** |
 | Live cloud run (PLAN.md T10) | **NOT ATTEMPTED** |

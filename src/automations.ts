@@ -326,19 +326,25 @@ function matchesCron(parsed: ParsedCron, date: Date): boolean {
 }
 
 /**
- * True when `cron` matches `nowMs` and nothing fired in the current minute
- * bucket. A stale `lastTriggeredAt` (missed ticks while the worker was
- * down) still yields exactly one run — occurrences coalesce, never queue.
+ * True when `cron` had an occurrence inside the tick window ending at `nowMs`
+ * and nothing has fired since it. Scanning the window rather than testing the
+ * exact minute is what lets an offset cron (`3-58/5`) fire at all — it never
+ * matches the tick minute itself. Missed occurrences coalesce into one run,
+ * never a queue.
  */
 export function isScheduleDue(cron: string, nowMs: number, lastTriggeredAtMs?: number): boolean {
   const parsed = parseCron(cron);
-  if (!parsed || !matchesCron(parsed, new Date(nowMs))) {
+  if (!parsed) {
     return false;
   }
-  if (lastTriggeredAtMs === undefined) {
-    return true;
+  for (let back = 0; back < SCHEDULE_FLOOR_MINUTES; back++) {
+    const fireMs = (Math.floor(nowMs / 60000) - back) * 60000;
+    if (!matchesCron(parsed, new Date(fireMs))) {
+      continue;
+    }
+    return lastTriggeredAtMs === undefined || lastTriggeredAtMs < fireMs;
   }
-  return lastTriggeredAtMs < Math.floor(nowMs / 60000) * 60000;
+  return false;
 }
 
 // ---------------------------------------------------------------------------
