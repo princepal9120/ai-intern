@@ -30,6 +30,20 @@ import {
 import { boundTail, parseGitHubRepoUrl, redactSecrets } from "../security.js";
 import { messageText, renderRunTranscript } from "../transcript.js";
 
+export async function pinSandboxEgress(
+  env: Env,
+  sandboxId: string,
+  repoUrl: string,
+  egressHosts?: string[],
+): Promise<void> {
+  const sandbox = getSandbox(env.Sandbox, sandboxId);
+  if (egressHosts && egressHosts.length > 0) {
+    await sandbox.approveHarnessEgress(egressHosts);
+  }
+  const { owner, repo } = parseGitHubRepoUrl(repoUrl);
+  await sandbox.approveRepoScope(`/${owner}/${repo}`);
+}
+
 export function createSandboxOps(env: Env, sandboxId: string, egressHosts?: string[]): SandboxOps {
   const sandbox = getSandbox(env.Sandbox, sandboxId);
   return {
@@ -37,11 +51,7 @@ export function createSandboxOps(env: Env, sandboxId: string, egressHosts?: stri
       // The clone runs before anything else, so it is where this run's egress
       // is pinned down: the selected harness's hosts only (T22), and the
       // GitHub credential scoped to this one repo (B6).
-      if (egressHosts && egressHosts.length > 0) {
-        await sandbox.approveHarnessEgress(egressHosts);
-      }
-      const { owner, repo } = parseGitHubRepoUrl(repoUrl);
-      await sandbox.approveRepoScope(`/${owner}/${repo}`);
+      await pinSandboxEgress(env, sandboxId, repoUrl, egressHosts);
       await sandbox.gitCheckout(repoUrl, { branch: opts.branch, targetDir: opts.targetDir });
     },
     async writeFile(path, content) {

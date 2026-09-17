@@ -202,6 +202,48 @@ import '../styles/theme.css';
       color: #ff6842;
       border-left: 2px solid #ff4512;
     }
+
+    .agent-tab {
+      flex-shrink: 0;
+      white-space: nowrap;
+      min-height: 44px;
+    }
+
+    #demo-step-display > div > .w-full {
+      min-width: 0;
+    }
+
+    @media (max-width: 639px) {
+      header nav { gap: 0 1rem; }
+      header nav a, footer nav a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+      }
+      #hero-replay-btn, .resolve-btn { min-height: 44px; }
+      #demo-step-display > div:first-child,
+      #demo-step-display > div > .w-full > div:first-child {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+      }
+      #demo-step-display > div > .w-full > div:first-child > div {
+        flex-wrap: wrap;
+      }
+      #demo-step-display > div:not(:first-child) {
+        flex-direction: column;
+      }
+      #demo-step-display .diff-line-add,
+      #demo-step-display .diff-line-del { overflow-wrap: anywhere; }
+      #demo-console-body > div:last-child > div:first-child {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+      #pricing .manga-panel:first-child > .absolute {
+        position: static;
+        margin-bottom: 1rem;
+      }
+    }
   </style>
 </head>
 <body class="antialiased selection:bg-[#63c8c1] selection:text-black grid-bg">
@@ -1642,7 +1684,6 @@ import '../styles/theme.css';
 
 </body>
 </html>
-
 
 
 
