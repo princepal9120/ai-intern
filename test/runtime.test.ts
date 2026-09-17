@@ -325,11 +325,19 @@ describe("sandbox HTTPS egress", () => {
 });
 
 describe("sandbox egress allowlist (T5)", () => {
+  // allowedHosts is an instance property on the base Container class, so
+  // read it off an instance. The cast keeps tsc happy: the real DO
+  // constructor takes (ctx, env), but under test the base is mocked.
+  function sandboxHosts(): string[] | undefined {
+    const Ctor = Sandbox as unknown as new () => { allowedHosts?: string[] };
+    return new Ctor().allowedHosts;
+  }
+
   it("deny-by-default allowlist contains both intercepted hosts plus codeload", () => {
     // PLAN.md §6 T5: allowedHosts is evaluated before outbound handlers.
     // Anything unlisted cannot leave the container, including from
     // repository code OpenCode runs.
-    expect(Sandbox.allowedHosts).toEqual([
+    expect(sandboxHosts()).toEqual([
       "generativelanguage.googleapis.com",
       "github.com",
       "codeload.github.com", // git clone fetches packs here
@@ -337,10 +345,10 @@ describe("sandbox egress allowlist (T5)", () => {
   });
 
   it("refuses a non-listed host", () => {
-    expect(Sandbox.allowedHosts).not.toContain("attacker.example");
+    expect(sandboxHosts()).not.toContain("attacker.example");
     // Deliberately shipped without npm registry: enabling `npm install`
     // inside runs is the widest exfiltration channel on the list (T5).
-    expect(Sandbox.allowedHosts).not.toContain("registry.npmjs.org");
+    expect(sandboxHosts()).not.toContain("registry.npmjs.org");
   });
 });
 

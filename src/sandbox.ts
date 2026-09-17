@@ -78,6 +78,20 @@ export class Sandbox<Env = WorkerEnv> extends SandboxBase<Env> {
   override sleepAfter = "1m";
   override interceptHttps = true;
 
+  /**
+   * Deny-by-default egress allowlist. Anything unlisted cannot leave the
+   * container, including from repository code OpenCode runs.
+   *
+   * Instance property (not static): the base Container class declares
+   * `allowedHosts?: string[]` as an instance member and the egress gate
+   * reads `this.allowedHosts` at runtime.
+   */
+  override allowedHosts = [
+    "generativelanguage.googleapis.com",
+    "github.com",
+    "codeload.github.com", // git clone fetches packs here
+  ];
+
   static override get outboundByHost() {
     return {
       "generativelanguage.googleapis.com": forwardGoogle,
