@@ -2,7 +2,23 @@ import { execFileSync } from "node:child_process";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Sandbox } from "../src/sandbox.js";
 
-vi.mock("@cloudflare/sandbox", () => ({ Sandbox: class {} }));
+vi.mock("@cloudflare/sandbox", () => ({
+  Sandbox: class {},
+  ContainerProxy: class {},
+  proxyToSandbox: vi.fn().mockResolvedValue(null),
+  getSandbox: vi.fn(),
+}));
+
+vi.mock("agents/routing", () => ({
+  getAgentByName: vi.fn(),
+  routeAgentRequest: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("../src/agents/opencode-agent.js", () => ({ OpenCodeAgent: class {} }));
+vi.mock("../src/agents/orchestrator.js", () => ({ CodingOrchestrator: class {} }));
+
+import { getAgentByName } from "agents/routing";
+import { proxyToSandbox } from "@cloudflare/sandbox";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -13,6 +29,8 @@ import type { CodingTaskInput } from "../src/opencode-input.js";
 import {
   COMPUTER_PREVIEW_MESSAGE,
   ComputerPreviewAdapter,
+  MAX_FILE_CHARS,
+  MAX_PROGRESS_EVENTS,
   SandboxRuntimeAdapter,
   buildOpencodeArgv,
   buildOpencodeConfig,
@@ -30,7 +48,6 @@ const INPUT: CodingTaskInput = {
   publishPullRequest: false,
   sandboxId: "run-abcdef12345678",
   codingModel: "google/gemini-2.0-flash",
-  providerBaseUrl: "https://generativelanguage.googleapis.com",
 };
 
 interface RecordedExec {
@@ -312,19 +329,18 @@ describe("streamed opencode progress", () => {
     const ops = makeFakeOps();
     const events: string[] = [];
     ops.exec = async (command, opts) => {
-      execs: for (const line of [
+      for (const line of [
         JSON.stringify({ type: "step-start", part: "reading src/a.ts" }),
         "not json at all",
         JSON.stringify({ type: "step-finish" }),
       ]) {
         opts?.onOutput?.("stdout", `${line}\n`);
       }
-      void execs;
       return { stdout: "", stderr: "", exitCode: 0 };
     };
     const adapter = new SandboxRuntimeAdapter();
     const result = await adapter.runCodingTask(ops, INPUT, (event) => {
-      if (event.phase === "code") events.push(event.message);
+      if (event.phase === "code" && event.message.startsWith("[opencode]")) events.push(event.message);
     });
     expect(result.status).toBe("completed");
     expect(events.length).toBe(3);
@@ -355,10 +371,11 @@ describe("streamed opencode progress", () => {
     };
     const events: ProgressEvent[] = [];
     const adapter = new SandboxRuntimeAdapter();
-    const result = await adapter.runCodingTask(ops, INPUT, (event) => events.push(event));
+    const result = await adapter.runCodingTask(ops, INPUT, (event) => { events.push(event); });
     expect(result.status).toBe("completed");
-    const codeEvents = events.filter((event) => event.phase === "code");
-    expect(codeEvents.length).toBe(MAX_PROGRESS_EVENTS);
+    // "Running OpenCode headlessly." is one code-phase emit; streamed output is capped separately.
+    const streamedCodeEvents = events.filter((event) => event.phase === "code" && event.message.startsWith("[opencode]"));
+    expect(streamedCodeEvents.length).toBe(MAX_PROGRESS_EVENTS);
   });
 
   it("redacts secrets from the stderr tail", async () => {
@@ -455,5 +472,40 @@ describe("runtime seam", () => {
     await expect(adapter.runCodingTask(makeFakeOps(), INPUT, () => {})).rejects.toThrow(
       COMPUTER_PREVIEW_MESSAGE,
     );
+  });
+});
+
+describe("per-user orchestrator isolation", () => {
+  function makeEnv() {
+    return {
+      CodingOrchestrator: {},
+      Sandbox: {},
+      ASSETS: { fetch: async () => new Response("assets") },
+    } as unknown as Env;
+  }
+
+  it("routes requests to per-user orchestrator DO", async () => {
+    vi.mocked(proxyToSandbox).mockResolvedValue(null);
+    const stubFetch = vi.fn().mockResolvedValue(new Response("routed"));
+    vi.mocked(getAgentByName).mockResolvedValue({ fetch: stubFetch } as never);
+    const worker = (await import("../src/index.js")).default;
+    const res = await worker.fetch(
+      new Request("https://example.com/api/runs", {
+        headers: { "CF-Access-Authenticated-User-Email": "alice@example.com" },
+      }),
+      makeEnv(),
+    );
+    expect(await res.text()).toBe("routed");
+    expect(getAgentByName).toHaveBeenCalledWith({}, "alice@example.com");
+    expect(stubFetch).toHaveBeenCalledOnce();
+  });
+
+  it("returns 401 without authenticated user email", async () => {
+    vi.mocked(proxyToSandbox).mockResolvedValue(null);
+    vi.mocked(getAgentByName).mockClear();
+    const worker = (await import("../src/index.js")).default;
+    const res = await worker.fetch(new Request("https://example.com/api/runs"), makeEnv());
+    expect(res.status).toBe(401);
+    expect(getAgentByName).not.toHaveBeenCalled();
   });
 });
