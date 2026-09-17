@@ -68,6 +68,16 @@ Copy .dev.vars.example to the ignored .dev.vars for local configuration. Optiona
 
 ## Deployment preparation
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/princepal9120/ai-intern)
+
+### Prerequisites
+
+1. Workers Paid plan (Durable Objects + Containers require it).
+2. An AI Gateway with a stored Google AI Studio key ([BYOK](https://developers.cloudflare.com/ai-gateway/configuration/bring-your-own-keys/)) — the key never enters this repo or the container.
+3. Cloudflare Access in front of the Worker route, with a bypass for `/api/slack/*` and `/api/github/webhook`, before any non-local use.
+4. Optional `GITHUB_TOKEN` secret — required for PR publishing.
+5. Optional Slack app — see the Slack docs.
+
 **Resolve the readiness blockers before deploying.** Confirm Workers/Containers plan eligibility, quotas, and account billing in current Cloudflare documentation. Configure an account-owned AI Gateway with supported Google stored BYOK or Unified Billing, and select available models. The internal helper uses AI.gateway(GATEWAY_ID).run; the Sandbox interception connection is not wired yet.
 
 After implementing and validating the missing security boundaries, operator commands are:
