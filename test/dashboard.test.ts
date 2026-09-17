@@ -38,7 +38,8 @@ vi.mock("ai", () => ({
     typeof part.type === "string" && part.type.startsWith("tool-"),
 }));
 
-import { App } from "../client/app";
+import { App } from "../dashboard/app";
+import { TaskForm } from "../web/src/components/TaskForm";
 
 afterEach(() => {
   mocks.chat.messages = [];
@@ -110,5 +111,47 @@ describe("dashboard rendering", () => {
     expect(markup).toContain("sandbox failed");
     expect(markup).toContain("The sandbox exited early.");
     expect(markup).toContain("exit code 1");
+  });
+
+  it("renders task submission form", () => {
+    const formMarkup = renderToStaticMarkup(React.createElement(TaskForm));
+
+    expect(formMarkup).toContain('data-testid="task-submission-form"');
+    expect(formMarkup).toContain('type="url"');
+    expect(formMarkup).toContain("required");
+    expect(formMarkup).toContain("<textarea");
+    expect(formMarkup).toContain('type="checkbox"');
+    expect(formMarkup).toContain('value="main"');
+
+    const appMarkup = renderApp();
+
+    expect(appMarkup).toContain('data-testid="task-submission-form"');
+    expect(appMarkup).toContain('type="url"');
+    expect(appMarkup).toContain("<textarea");
+    expect(appMarkup).toContain('type="checkbox"');
+  });
+
+  it("renders diff output for completed runs", () => {
+    mocks.runsById = {
+      "run-diff-1": {
+        runId: "run-diff-1",
+        status: "completed",
+        agentType: "coding-agent",
+        parentToolCallId: "call-1",
+        parts: [{ text: "done" }],
+        summary: "Done.",
+        diff: "diff --git a/src/a.ts b/src/a.ts\n+added line\n-removed line",
+      },
+    };
+
+    const markup = renderApp();
+
+    expect(markup).toContain("run-diff-1");
+    expect(markup).toContain("completed");
+    expect(markup).toContain("diff --git");
+    expect(markup).toContain("added line");
+    expect(markup).toContain("removed line");
+    expect(markup).toContain("<pre");
+    expect(markup).toContain("<code");
   });
 });

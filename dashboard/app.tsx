@@ -11,6 +11,8 @@ import {
 import { useAgent, useAgentToolEvents } from "agents/react";
 import { isToolUIPart, type UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DiffViewer } from "./components/DiffViewer";
+import { TaskForm } from "../web/src/components/TaskForm";
 import { extractPendingApprovals, toolDisplayName } from "./ui-helpers";
 
 const ORCHESTRATOR_AGENT = "coding-orchestrator";
@@ -28,6 +30,7 @@ interface RetainedRun {
   updatedAt: number;
   summary?: string;
   error?: string;
+  diff?: string;
 }
 
 function partText(part: UIMessage["parts"][number]): string | null {
@@ -50,6 +53,17 @@ function runPartText(part: unknown): string {
   } catch {
     return String(part);
   }
+}
+
+// Diff output for completed live runs. The orchestrator surfaces the unified
+// diff on the run record when present; anything else is not diff output.
+function extractCompletedDiff(run: unknown): string | null {
+  if (typeof run !== "object" || run === null) return null;
+  const record = run as Record<string, unknown>;
+  if (record["status"] !== "completed") return null;
+  const direct = record["diff"];
+  if (typeof direct === "string" && direct.trim() !== "") return direct;
+  return null;
 }
 
 function useRetainedRuns(refreshToken: number): { runs: RetainedRun[]; error: string | null } {
@@ -283,54 +297,21 @@ export function App(): React.JSX.Element {
       <main className="layout">
         <section className="panel" aria-label="New coding task">
           <h2>New coding task</h2>
-          <form onSubmit={submitTask} className="form">
-            <label className="field">
-              <span>Repository URL</span>
-              <input
-                type="url"
-                inputMode="url"
-                required
-                placeholder="https://github.com/owner/repo"
-                value={repoUrl}
-                onChange={(event) => setRepoUrl(event.target.value)}
-              />
-            </label>
-            <label className="field">
-              <span>Base branch</span>
-              <input
-                type="text"
-                value={baseBranch}
-                onChange={(event) => setBaseBranch(event.target.value)}
-                placeholder="main"
-              />
-            </label>
-            <label className="field">
-              <span>Task</span>
-              <textarea
-                required
-                rows={5}
-                placeholder="Describe the change you want, e.g. fix the login redirect and add a test."
-                value={task}
-                onChange={(event) => setTask(event.target.value)}
-              />
-            </label>
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={publishPullRequest}
-                onChange={(event) => setPublishPullRequest(event.target.checked)}
-              />
-              <span>Open a pull request with the result (requires GITHUB_TOKEN)</span>
-            </label>
-            <div className="actions">
-              <button type="submit" disabled={busy}>
-                {submitting ? "Submitting" : busy ? "Working" : "Send for approval"}
-              </button>
-              <button type="button" onClick={clearAll} className="secondary" disabled={busy}>
-                {clearing ? "Clearing history" : "Clear history"}
-              </button>
-            </div>
-          </form>
+          <TaskForm
+            repoUrl={repoUrl}
+            task={task}
+            baseBranch={baseBranch}
+            publishPullRequest={publishPullRequest}
+            busy={busy}
+            submitting={submitting}
+            clearing={clearing}
+            onRepoUrlChange={setRepoUrl}
+            onTaskChange={setTask}
+            onBaseBranchChange={setBaseBranch}
+            onPublishPullRequestChange={setPublishPullRequest}
+            onSubmit={submitTask}
+            onClear={clearAll}
+          />
           {notice ? <p className="notice">{notice}</p> : null}
           {chat.error ? <p className="error">Chat error: {chat.error.message}</p> : null}
           {runsError ? <p className="error">Runs registry: {runsError}</p> : null}
@@ -419,23 +400,32 @@ export function App(): React.JSX.Element {
             <p className="muted">No live runs. Approved tasks appear here while they execute.</p>
           ) : (
             <ol className="runs">
-              {toolRuns.map((run) => (
-                <li key={run.runId} className="run">
-                  <div className="runhead">
-                    <span className="runid">{run.runId}</span>
-                    <span className={`status ${run.status}`}>{run.status}</span>
-                  </div>
-                  <div className="muted">
-                    {run.agentType}
-                    {run.parentToolCallId ? ` · tool call ${run.parentToolCallId}` : ""}
-                  </div>
-                  {run.parts.length > 0 ? (
-                    <pre className="text">{run.parts.map(runPartText).join("\n")}</pre>
-                  ) : null}
-                  {run.summary ? <pre className="text">{run.summary}</pre> : null}
-                  {run.error ? <p className="error">{run.error}</p> : null}
-                </li>
-              ))}
+              {toolRuns.map((run) => {
+                const completedDiff = extractCompletedDiff(run);
+                return (
+                  <li key={run.runId} className="run">
+                    <div className="runhead">
+                      <span className="runid">{run.runId}</span>
+                      <span className={`status ${run.status}`}>{run.status}</span>
+                    </div>
+                    <div className="muted">
+                      {run.agentType}
+                      {run.parentToolCallId ? ` · tool call ${run.parentToolCallId}` : ""}
+                    </div>
+                    {run.parts.length > 0 ? (
+                      <pre className="text">{run.parts.map(runPartText).join("\n")}</pre>
+                    ) : null}
+                    {run.summary ? <pre className="text">{run.summary}</pre> : null}
+                    {run.error ? <p className="error">{run.error}</p> : null}
+                    {run.status === "completed" && completedDiff ? (
+                      <DiffViewer diff={completedDiff} runId={run.runId} />
+                    ) : null}
+                    {run.status === "completed" && !completedDiff ? (
+                      <p className="muted">No file changes produced</p>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ol>
           )}
 
@@ -458,6 +448,9 @@ export function App(): React.JSX.Element {
                     <pre className="text">{run.task}</pre>
                     {run.summary ? <pre className="text">{run.summary}</pre> : null}
                     {run.error ? <p className="error">{run.error}</p> : null}
+                    {run.status === "completed" && run.diff ? (
+                      <DiffViewer diff={run.diff} runId={run.runId} />
+                    ) : null}
                     {run.status === "pending" || run.status === "running" ? (
                       <button type="button" className="secondary" onClick={() => cancelRun(run.runId)}>
                         Cancel run
