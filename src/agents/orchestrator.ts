@@ -11,13 +11,14 @@ import { z } from "zod";
 import type { Env } from "../env.js";
 import {
   formatAgentToolInput,
+  parseAgentResult,
   type CodingTaskInput,
 } from "../opencode-input.js";
 import {
   MAX_CONCURRENT_RUNS,
+  RunStore,
   canStartRun,
   createRun,
-  transitionRun,
   type DelegatedRun,
   type RunStatus,
 } from "../runs.js";
@@ -51,6 +52,13 @@ const DEFAULT_CODING_MODEL = "google/gemini-2.0-flash";
 export class CodingOrchestrator extends Think<Env, OrchestratorState> {
   /** The orchestrator plans and delegates; it never runs shell commands. */
   override workspaceBash = false;
+
+  private get store(): RunStore {
+    return new RunStore(
+      () => this.state?.runs ?? [],
+      (runs) => this.setState({ runs }),
+    );
+  }
 
   private runs(): DelegatedRun[] {
     return this.state?.runs ?? [];
@@ -106,7 +114,7 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
     childExecute: NonNullable<ReturnType<typeof agentTool>["execute"]>,
     toolCallId: string | undefined,
   ): Promise<string> {
-    const runs = this.runs();
+    const runs = this.store.list();
     if (!canStartRun(runs)) {
       throw new Error(
         `Already running ${MAX_CONCURRENT_RUNS} coding tasks. Wait for one to finish before starting another.`,
@@ -119,13 +127,6 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
           "Set the GITHUB_TOKEN secret or retry without requesting a pull request.",
       );
     }
-    const origin = (this.env.WORKER_ORIGIN ?? "").replace(/\/+$/, "");
-    if (!origin) {
-      throw new Error(
-        "WORKER_ORIGIN is not configured, so the sandbox cannot reach the provider gateway. " +
-          "Set WORKER_ORIGIN to the public URL of this Worker.",
-      );
-    }
     const callId = toolCallId ?? crypto.randomUUID();
     const runId = `agent-tool:${callId}`;
     const sandboxId = makeSandboxId(input.repoUrl, input.task, callId);
@@ -136,10 +137,8 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
       publishPullRequest: input.publishPullRequest,
       sandboxId,
       codingModel: this.env.CODING_MODEL || DEFAULT_CODING_MODEL,
-      providerBaseUrl: `${origin}/api/provider/google`,
     };
-    this.saveRuns([
-      ...runs,
+    this.store.add(
       createRun({
         runId,
         sandboxId,
@@ -148,17 +147,25 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
         baseBranch: fullInput.baseBranch,
         publishPullRequest: fullInput.publishPullRequest,
       }),
-    ]);
+    );
     const finish = (status: RunStatus, patch?: { summary?: string; error?: string }) => {
-      this.saveRuns(
-        this.runs().map((run) => (run.runId === runId ? transitionRun(run, status, patch) : run)),
-      );
+      this.store.transition(runId, status, patch);
     };
-    this.markRunning(runId);
+    this.store.transition(runId, "running");
     try {
       const output = await childExecute(formatAgentToolInput(fullInput), { toolCallId: callId });
       if (typeof output === "string") {
-        finish("completed", { summary: output.slice(0, 4000) });
+        // The child reports status in a structured envelope. Trusting the transport
+        // type instead would mark failed runs "completed".
+        const parsed = parseAgentResult(output);
+        if (parsed?.status === "completed") {
+          finish("completed", { summary: output.slice(0, 4000) });
+          return output;
+        }
+        finish("error", {
+          summary: output.slice(0, 4000),
+          error: redactSecrets(parsed?.summary ?? output.slice(0, 4000)).slice(0, 4000),
+        });
         return output;
       }
       const message = `Coding run failed: ${JSON.stringify(output).slice(0, 2000)}`;
@@ -171,21 +178,11 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
     }
   }
 
-  private markRunning(runId: string): void {
-    this.saveRuns(
-      this.runs().map((run) => (run.runId === runId ? transitionRun(run, "running") : run)),
-    );
-  }
-
   /** Cancel a retained run and destroy its sandbox. Returns null when unknown. */
   async cancelRun(runId: string): Promise<DelegatedRun | null> {
-    const run = this.runs().find((candidate) => candidate.runId === runId) ?? null;
+    const run = this.store.get(runId);
     if (!run) return null;
-    this.saveRuns(
-      this.runs().map((candidate) =>
-        candidate.runId === runId ? transitionRun(candidate, "cancelled") : candidate,
-      ),
-    );
+    const updated = this.store.transition(runId, "cancelled");
     try {
       const { getSandbox } = await import("@cloudflare/sandbox");
       await getSandbox(this.env.Sandbox, run.sandboxId).destroy();
@@ -193,11 +190,11 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
       // Best effort: the registry already records the cancellation.
       console.warn(`Failed to destroy sandbox ${run.sandboxId}: ${redactSecrets(String(error))}`);
     }
-    return { ...run, status: "cancelled" as const };
+    return updated;
   }
 
   async clearRuns(): Promise<void> {
-    this.saveRuns([]);
+    this.store.clear();
   }
 
   override async onRequest(request: Request): Promise<Response> {
@@ -208,14 +205,14 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
     }
     const id = match[1] ? decodeURIComponent(match[1]) : null;
     if (request.method === "GET" && id === null) {
-      return Response.json({ runs: this.runs() });
+      return Response.json({ runs: this.store.list() });
     }
     if (request.method === "DELETE" && id === null) {
       await this.clearRuns();
       return Response.json({ ok: true });
     }
     if (id !== null && request.method === "GET") {
-      const run = this.runs().find((candidate) => candidate.runId === id) ?? null;
+      const run = this.store.get(id);
       return run ? Response.json({ run }) : Response.json({ error: "Run not found." }, { status: 404 });
     }
     if (id !== null && request.method === "DELETE") {

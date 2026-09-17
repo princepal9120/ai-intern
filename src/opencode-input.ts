@@ -16,7 +16,6 @@ const codingTaskInputSchema = z.object({
   publishPullRequest: z.boolean(),
   sandboxId: z.string().min(1),
   codingModel: z.string().min(1),
-  providerBaseUrl: z.string().min(1),
 });
 
 export type CodingTaskInput = z.infer<typeof codingTaskInputSchema>;
@@ -126,4 +125,17 @@ export function parseAgentResultText(text: string): CodingTaskResult {
     throw new Error("Coding result envelope is not valid JSON.");
   }
   return codingTaskResultSchema.parse(json);
+}
+
+/**
+ * Non-throwing result parser for the orchestrator. Returns the validated
+ * envelope or null when absent/malformed so callers never mark a failed
+ * or garbled run as silently successful.
+ */
+export function parseAgentResult(text: string): CodingTaskResult | null {
+  try {
+    return parseAgentResultText(text);
+  } catch {
+    return null;
+  }
 }
