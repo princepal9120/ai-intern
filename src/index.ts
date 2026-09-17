@@ -85,7 +85,7 @@ async function handleGitHubWebhook(request: Request, env: Env): Promise<Response
 }
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     try {
       // proxyToSandbox only needs the Sandbox binding; adapt the type.
       const sandboxEnv = {
@@ -99,7 +99,7 @@ export default {
       if (runsResponse) {
         return runsResponse;
       }
-      const slackEventsResponse = await handleSlackEvents(request, env, ctx);
+      const slackEventsResponse = await handleSlackEvents(request, env, ctx ?? { waitUntil: () => {} } as unknown as ExecutionContext);
       if (slackEventsResponse) {
         return slackEventsResponse;
       }

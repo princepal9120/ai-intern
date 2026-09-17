@@ -16,7 +16,6 @@ const INPUT: CodingTaskInput = {
   publishPullRequest: false,
   sandboxId: "run-abcdef12345678",
   codingModel: "google/gemini-2.0-flash",
-  providerBaseUrl: "https://example.workers.dev/api/provider/google",
 };
 
 describe("agent tool input envelope", () => {

@@ -9,3 +9,6 @@ wrangler-devenv.json
 
 .astro/
 .vitest/
+.build/
+ai-intern-docs/
+
