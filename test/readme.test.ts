@@ -38,9 +38,22 @@ describe("README structure (T24 honest-ship contract)", () => {
     expect(README).not.toContain("providerBaseUrl");
   });
 
-  it("names the current coding model default and the google/* limit", () => {
+  it("names the current coding model default and the per-harness provider rule", () => {
     expect(README).toContain("google/gemini-3.5-flash-lite");
-    expect(README).toContain("google/*");
+    expect(README).toContain("AGENT_HARNESS");
+    // T23 removed the google-only lock-in; the README must not re-assert it.
+    expect(README).not.toContain("Only google/* coding models are accepted");
+    expect(README).not.toContain("limited to `google/*`");
+  });
+
+  it("states that subscription credentials are not proxied", () => {
+    expect(README).toContain("API-key harnesses only");
+    expect(README).toContain("Free, Pro, or Max");
+  });
+
+  it("does not claim Slack events or automations are unbuilt", () => {
+    expect(README).not.toContain("There is no Automations Durable Object");
+    expect(README).toContain("SLACK_APPROVERS");
   });
 
   it("pins the versions that couple to the run contract", () => {
@@ -51,6 +64,8 @@ describe("README structure (T24 honest-ship contract)", () => {
   it("documents the Slack slash command without claiming unbuilt surfaces", () => {
     expect(README).toContain("/api/slack/command");
     expect(README).toContain("/ai-intern");
-    expect(README).toContain("Not built");
+    // Shipped surfaces are named; unproven ones stay labelled unverified.
+    expect(README).toContain("/api/slack/events");
+    expect(README).toContain("No P3 live workspace verification is claimed");
   });
 });
