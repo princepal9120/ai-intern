@@ -5,7 +5,7 @@ description: Known gaps and evidence required before production use.
 
 ## Status
 
-**Local prototype — 374/374 tests passing, typecheck and lint clean, build verified.**
+**Local prototype — 397/397 tests passing, typecheck and lint clean, build verified.**
 The static documentation/dashboard build and mocked tests do not establish that a deployed coding task works end to end. Do not expose it publicly or call it production-ready without completing the live run (T10) and cloud acceptance criteria in PLAN.md §15.
 
 **Shipped in code (unverified live):** dashboard, approval gate, Sandbox egress allowlist, scoped GitHub credential, Cloudflare Access gating, result envelope, progress streaming, Slack mention + slash-command lanes, automations engine (cron/GitHub/webhook/Slack/manual triggers), run_when TypeSafe Noul gate, harness seam (OpenCode/Claude Code/Codex), TypeSafe Choice intent classification wired into Slack dispatch, TypeSafe Score result quality wired into run completion.

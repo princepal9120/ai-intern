@@ -8,8 +8,8 @@
 |-------|--------|
 | `pnpm typecheck` | PASS |
 | `pnpm lint` | PASS |
-| `pnpm test` | PASS (374/374 across 30 files) |
-| `pnpm build` | PASS (docs: 22 pages, 904 links verified) |
+| `pnpm test` | PASS (397/397 across 32 files) |
+| `pnpm build` | PASS (docs: 23 pages, 1015 links verified) |
 | `pnpm docs:check` | PASS |
 | `npx wrangler deploy --dry-run` | **PASS (2026-09-18)** — OrbStack daemon started locally; container image `cloudflare/sandbox:0.12.9-opencode` + `opencode-ai@1.18.31` built and exported; all four DOs (`CodingOrchestrator`, `OpenCodeAgent`, `Sandbox`, `Automations`) bound with `new_sqlite_classes` migrations v1/v2 accepted; `instance_type: standard-1` accepted. **T1–T3 are now validated by the tool that catches them.** |
 | Live cloud run (PLAN.md T10) | **NOT ATTEMPTED** — requires a Cloudflare account; `spec/GOAL.md` forbids deploying from this environment. |
@@ -24,7 +24,7 @@ Specifically unmeasured: peak container memory (which decides `basic` vs `standa
 
 **The Claude Code and Codex CLIs ship in the image but have not run live.** The Dockerfile installs `opencode-ai@1.18.31`, `@anthropic-ai/claude-code@2.1.277`, and `@openai/codex@0.155.0`, and the image build verifies each binary reports its version. Their config, argv, env, and event parsers are unit-tested against their documented stream formats; neither has been run against the live API, so a stream-format drift would surface at the first real run, not before. The dashboard's harness picker is wired end to end; only OpenCode has completed a live run.
 
-## What the 374 tests do cover
+## What the 397 tests do cover
 
 - **Egress credential boundary.** `github.com` defaults to refusal; the credential is attached only for the run's own `/owner/repo`, with prefix-confusion siblings (`/owner/repo-evil`) and non-GitHub destinations refused, and no `Authorization` header reaching a refused request. The scope is proven to be installed *before* the clone, not after.
 - **Automation safety.** Approval required by default; unattended mode refused for a non-allowlisted repo and for any run mutating more than a pull request; the daily budget refusing run N+1 with its reason and resetting on the next UTC day; both kill switches.
@@ -33,6 +33,15 @@ Specifically unmeasured: peak container memory (which decides `basic` vs `standa
 - Run result envelope parsing (an `error` envelope never reads `completed`), Slack signature verification and replay bounds, approver allowlisting, burst grouping, cron parsing and coalescing, GitHub tree publishing including deletions.
 
 ## Fix history
+
+**2026-09-19 (inspo-driven dashboard redesign & full end-to-end UI polish)**
+- **Inspo-driven Design System & UI Skills Integration:** Reshaped the entire dashboard surface using Inspo MCP references (Buildkite, LlamaIndex, Anima, Tabnine) and UI-skills (@vercel-labs/web-design-guidelines, @s0xdk/refactoring-ui, @mengto/beautiful-shadows, @mengto/container-lines). Standardized obsidian elevation, hairline guides, layered shadows, live telemetry ribbon, and unified status tokens across all 5 views.
+- **Landing Page Integration:** Connected live dashboard (/app/) in landing nav, hero CTA, and footer.
+
+**2026-09-18 (end-to-end onboarding & UI-skills refinement)**
+- **Interactive Setup & Onboarding Checklist (`dashboard/src/components/OnboardingModal.tsx`):** Implemented the 6-pillar setup checklist covering Workers Paid SQLite storage, AI Gateway BYOK keys, Zero Trust Access bypasses, scoped GitHub PAT isolation, Slack bot allowlist, and first acceptance run. Refined with UI-skills (`pbakaus/harden`, `ibelick/baseline-ui`) with segmented filter tabs (All/Pending/Completed), checklist reset, copy-feedback, tabular numbers, and full accessibility attributes (`role="progressbar"`, `role="checkbox"`, `role="dialog", `useId`).
+- **Dashboard integration:** Added header Setup Guide launch button, empty-state onboarding card CTA, Escape hotkey handling, and starter task prefill.
+- **Documentation (`web/src/content/docs/docs/onboarding.md`):** Complete walkthrough published and verified at 23 HTML pages and 1012 links.
 
 **2026-09-18 (per-run harness selection + live TypeSafe check)**
 - **End-to-end harness selection.** The dashboard's New Coding Task form now picks the harness per run (OpenCode / Claude Code / Codex). `delegate_coding_task` accepts optional `harness` and `codingModel`; the orchestrator resolves them at approval time — an unknown harness or a harness/model mismatch fails on the approval card, never inside a container the human already approved. The child agent runs the approved harness, not the deploy default (`AGENT_HARNESS` remains the fallback). Per-harness models: `CODING_MODEL` (OpenCode), `CLAUDE_CODE_MODEL` (default `anthropic/claude-sonnet-4-6`), `CODEX_MODEL` (default `openai/gpt-5.3-codex`).
