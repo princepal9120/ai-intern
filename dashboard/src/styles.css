@@ -6,22 +6,23 @@
   --bg: #000000;
   --panel: #0a0c10;
   --panel-elevated: #11141b;
-  --line: #222733;
-  --line-light: #333b4d;
+  --line: #1e2530;
+  --line-light: #2c3545;
   --text: #e6edf3;
   --muted: #8b98a9;
-  --accent: #63c8c1;
+  --accent: #0B9F95;
+  --accent-light: #2dd4bf;
   --accent-ink: #000000;
-  --brand: #63c8c1;
-  --brand-light: #72d6cf;
+  --brand: #0B9F95;
+  --brand-light: #2dd4bf;
   --danger: #f06666;
   --ok: #4cc38a;
-  --pending: #c9a227;
-  --running: #4db4b0;
+  --pending: #f59e0b;
+  --running: #0B9F95;
   --radius: 12px;
   --space: 8px;
   --gutter: 16px;
-  --focus: 2px solid var(--accent);
+  --focus: 2px solid var(--accent-light);
 }
 
 * {
@@ -30,12 +31,25 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  background-color: var(--bg);
   color: var(--text);
   font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   overflow-x: hidden;
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(11, 159, 149, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 100% 100%, rgba(79, 156, 240, 0.04) 0%, transparent 40%);
+  background-attachment: fixed;
+}
+
+/* Glass and subtle elevation panels */
+.glass-panel {
+  background: rgba(9, 11, 14, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0px 2px 4px -1px rgba(0, 0, 0, 0.5), 0px 1px 0px 0px rgba(255, 255, 255, 0.02);
 }
 
 /* Custom Scrollbars */
@@ -45,16 +59,16 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #000000;
+  background: #05070a;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #222733;
+  background: #1f2733;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #333b4d;
+  background: #2d3848;
 }
 
 /* Focus styles */
@@ -95,4 +109,3 @@ details summary::-webkit-details-marker {
     scroll-behavior: auto !important;
   }
 }
-

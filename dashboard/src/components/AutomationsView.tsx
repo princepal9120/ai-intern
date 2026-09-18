@@ -10,10 +10,10 @@ export function AutomationsView(): JSX.Element {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-y-auto bg-black text-[#e6edf3] p-4 lg:p-8">
+    <div className="flex-1 flex flex-col h-full overflow-y-auto bg-[#0d1117] text-[#e6edf3] p-4 lg:p-8">
       <div className="max-w-5xl mx-auto w-full flex flex-col gap-6">
         {/* Header */}
-        <div className="border-b border-neutral-800 pb-4">
+        <div className="border-b border-white/[0.08] pb-4">
           <h2 className="text-base font-semibold text-white flex items-center gap-2">
             <span>Automations & Inbound Triggers</span>
             <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-teal-950/60 border border-teal-800/60 text-teal-400">
@@ -28,7 +28,7 @@ export function AutomationsView(): JSX.Element {
         {/* Integration Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* GitHub Webhook */}
-          <div className="border border-neutral-800 rounded-xl bg-[#090b0e] p-5 flex flex-col gap-3">
+          <div className="border border-white/[0.08] rounded-xl bg-[#07090e] shadow-sm p-5 flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 font-semibold text-sm text-white">
                 <svg className="w-5 h-5 text-teal-400" fill="currentColor" viewBox="0 0 24 24">
@@ -45,7 +45,7 @@ export function AutomationsView(): JSX.Element {
               Receives repo events (issues, PRs, comments) and automatically dispatches coding jobs to sandboxes.
             </p>
 
-            <div className="bg-black p-2.5 rounded-lg border border-neutral-800 flex items-center justify-between text-xs font-mono">
+            <div className="bg-[#0d1117] p-2.5 rounded-lg border border-white/[0.08] flex items-center justify-between text-xs font-mono">
               <span className="text-[#e6edf3] truncate">/api/github/webhook</span>
               <button
                 type="button"
@@ -61,7 +61,7 @@ export function AutomationsView(): JSX.Element {
           </div>
 
           {/* Slack Integration */}
-          <div className="border border-neutral-800 rounded-xl bg-[#090b0e] p-5 flex flex-col gap-3">
+          <div className="border border-white/[0.08] rounded-xl bg-[#07090e] shadow-sm p-5 flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 font-semibold text-sm text-white">
                 <svg className="w-5 h-5 text-teal-400" fill="currentColor" viewBox="0 0 24 24">
@@ -79,19 +79,19 @@ export function AutomationsView(): JSX.Element {
             </p>
 
             <div className="flex flex-col gap-1.5 text-xs font-mono">
-              <div className="bg-black p-2 rounded border border-neutral-800 flex items-center justify-between">
+              <div className="bg-[#0d1117] p-2 rounded border border-white/[0.08] flex items-center justify-between">
                 <span>Commands: /api/slack/command</span>
                 <button type="button" onClick={() => copyToClipboard("/api/slack/command", "slack1")} className="text-teal-400 text-[11px]">
                   {copiedEndpoint === "slack1" ? "Copied" : "Copy"}
                 </button>
               </div>
-              <div className="bg-black p-2 rounded border border-neutral-800 flex items-center justify-between">
+              <div className="bg-[#0d1117] p-2 rounded border border-white/[0.08] flex items-center justify-between">
                 <span>Events: /api/slack/events</span>
                 <button type="button" onClick={() => copyToClipboard("/api/slack/events", "slack2")} className="text-teal-400 text-[11px]">
                   {copiedEndpoint === "slack2" ? "Copied" : "Copy"}
                 </button>
               </div>
-              <div className="bg-black p-2 rounded border border-neutral-800 flex items-center justify-between">
+              <div className="bg-[#0d1117] p-2 rounded border border-white/[0.08] flex items-center justify-between">
                 <span>Interactivity: /api/slack/interact</span>
                 <button type="button" onClick={() => copyToClipboard("/api/slack/interact", "slack3")} className="text-teal-400 text-[11px]">
                   {copiedEndpoint === "slack3" ? "Copied" : "Copy"}
@@ -102,7 +102,7 @@ export function AutomationsView(): JSX.Element {
         </div>
 
         {/* Automations DO Engine */}
-        <div className="border border-neutral-800 rounded-xl bg-[#090b0e] p-5 flex flex-col gap-4">
+        <div className="border border-white/[0.08] rounded-xl bg-[#07090e] shadow-sm p-5 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white flex items-center gap-2">
               <svg className="w-4 h-4 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -118,15 +118,15 @@ export function AutomationsView(): JSX.Element {
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 font-mono text-xs">
-            <div className="bg-black p-3 rounded-lg border border-neutral-800 flex flex-col gap-1">
+            <div className="bg-[#0d1117] p-3 rounded-lg border border-white/[0.08] flex flex-col gap-1">
               <span className="text-[#8b98a9] text-[11px]">Cron Scheduler</span>
               <span className="text-white font-semibold">Hourly Health Tick</span>
             </div>
-            <div className="bg-black p-3 rounded-lg border border-neutral-800 flex flex-col gap-1">
+            <div className="bg-[#0d1117] p-3 rounded-lg border border-white/[0.08] flex flex-col gap-1">
               <span className="text-[#8b98a9] text-[11px]">Evaluation Model</span>
               <span className="text-white font-semibold">TypeSafe System One / Llama</span>
             </div>
-            <div className="bg-black p-3 rounded-lg border border-neutral-800 flex flex-col gap-1">
+            <div className="bg-[#0d1117] p-3 rounded-lg border border-white/[0.08] flex flex-col gap-1">
               <span className="text-[#8b98a9] text-[11px]">Run Capacity</span>
               <span className="text-white font-semibold">5 Concurrent Sandboxes</span>
             </div>

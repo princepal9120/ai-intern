@@ -129,18 +129,22 @@ function useRetainedRuns(refreshToken: number): { runs: RetainedRun[]; error: st
 
 const STARTER_TEMPLATES = [
   {
+    icon: "🧪",
     label: "Fix Failing Tests",
     task: "Investigate test failures in the repository, fix the root cause, and verify all test suites pass with zero regressions.",
   },
   {
+    icon: "⚡",
     label: "Add Unit Tests",
     task: "Identify uncovered functions in the core modules and add thorough unit test coverage with edge case tests.",
   },
   {
+    icon: "🧹",
     label: "Refactor & Clean",
     task: "Refactor duplicate utility logic, remove unused imports and dead code, and ensure clean types across the codebase.",
   },
   {
+    icon: "📖",
     label: "Documentation",
     task: "Review and update README and code comments to match recent API changes and architecture decisions.",
   },
@@ -472,7 +476,7 @@ export function App(): React.JSX.Element {
   return (
     <div className="min-h-screen bg-black text-[#e6edf3] font-sans selection:bg-[#63c8c1] selection:text-black flex flex-col">
       {/* TOP HEADER BAR */}
-      <header className="h-14 border-b border-neutral-800 bg-[#090b0e] px-4 lg:px-6 flex items-center justify-between z-20 shrink-0 shadow-sm">
+      <header className="h-14 border-b border-white/[0.08] bg-[#07090e]/95 backdrop-blur-md px-4 lg:px-6 flex items-center justify-between z-20 shrink-0 sticky top-0 shadow-[0_1px_3px_rgba(0,0,0,0.5)]">
         <div className="flex items-center gap-3">
           <a href="/" className="flex items-center gap-2.5 text-white hover:opacity-90 transition-opacity">
             <img src="/assets/mascot/shiba-logo-animated.svg" alt="Shiba Mascot" className="w-8 h-8 rounded-lg shadow-[0_0_12px_rgba(11,159,149,0.4)] object-cover border border-teal-500/50" />
@@ -488,14 +492,14 @@ export function App(): React.JSX.Element {
         </div>
 
         {/* DESKTOP VIEW NAVIGATION TABS */}
-        <nav className="hidden md:flex items-center gap-1 bg-black p-1 rounded-xl border border-neutral-800 text-xs">
+        <nav className="hidden md:flex items-center gap-1 bg-[#0d1117] p-1 rounded-xl border border-white/[0.08] text-xs shadow-inner">
           <button
             type="button"
             onClick={() => setMainView("tasks")}
             className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
               mainView === "tasks"
-                ? "bg-[#1c2430] text-white font-semibold shadow-sm"
-                : "text-[#8b98a9] hover:text-white"
+                ? "bg-teal-950/80 text-teal-300 border border-teal-500/30 font-semibold shadow-sm"
+                : "text-[#8b98a9] hover:text-white hover:bg-white/[0.04]"
             }`}
           >
             <span>🚀 Task Console</span>
@@ -506,8 +510,8 @@ export function App(): React.JSX.Element {
             onClick={() => setMainView("vm")}
             className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
               mainView === "vm"
-                ? "bg-[#1c2430] text-teal-400 font-semibold shadow-sm"
-                : "text-[#8b98a9] hover:text-teal-400"
+                ? "bg-teal-950/80 text-teal-300 border border-teal-500/30 font-semibold shadow-sm"
+                : "text-[#8b98a9] hover:text-teal-300 hover:bg-white/[0.04]"
             }`}
           >
             <span>🖥️ VM Inspector</span>
@@ -521,8 +525,8 @@ export function App(): React.JSX.Element {
             onClick={() => setMainView("runs")}
             className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
               mainView === "runs"
-                ? "bg-[#1c2430] text-white font-semibold shadow-sm"
-                : "text-[#8b98a9] hover:text-white"
+                ? "bg-teal-950/80 text-teal-300 border border-teal-500/30 font-semibold shadow-sm"
+                : "text-[#8b98a9] hover:text-white hover:bg-white/[0.04]"
             }`}
           >
             <span>📋 Run Registry</span>
@@ -533,8 +537,8 @@ export function App(): React.JSX.Element {
             onClick={() => setMainView("automations")}
             className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
               mainView === "automations"
-                ? "bg-[#1c2430] text-white font-semibold shadow-sm"
-                : "text-[#8b98a9] hover:text-white"
+                ? "bg-teal-950/80 text-teal-300 border border-teal-500/30 font-semibold shadow-sm"
+                : "text-[#8b98a9] hover:text-white hover:bg-white/[0.04]"
             }`}
           >
             <span>⚡ Automations</span>
@@ -545,8 +549,8 @@ export function App(): React.JSX.Element {
             onClick={() => setMainView("architecture")}
             className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
               mainView === "architecture"
-                ? "bg-[#1c2430] text-white font-semibold shadow-sm"
-                : "text-[#8b98a9] hover:text-white"
+                ? "bg-teal-950/80 text-teal-300 border border-teal-500/30 font-semibold shadow-sm"
+                : "text-[#8b98a9] hover:text-white hover:bg-white/[0.04]"
             }`}
           >
             <span>🏗️ Architecture</span>
@@ -555,14 +559,14 @@ export function App(): React.JSX.Element {
 
         <div className="flex items-center gap-3 sm:gap-4">
           {/* Active Sandboxes Pill */}
-          <div className="hidden sm:inline-flex items-center gap-1.5 border border-neutral-800 bg-black rounded-full px-2.5 py-1 text-xs font-mono text-[#8b98a9]">
+          <div className="hidden sm:inline-flex items-center gap-1.5 border border-white/[0.08] bg-[#0d1117] rounded-full px-2.5 py-1 text-xs font-mono text-[#8b98a9] shadow-sm">
             <span className={`w-1.5 h-1.5 rounded-full ${activeSandboxCount > 0 ? "bg-[#4f9cf0] animate-pulse" : "bg-zinc-600"}`} />
             <span>{activeSandboxCount} / 5 sandboxes active</span>
           </div>
 
           {/* Connection Status */}
           <div
-            className="inline-flex items-center gap-2 border border-neutral-800 bg-black rounded-full px-3 py-1 text-xs font-medium text-[#8b98a9]"
+            className="inline-flex items-center gap-2 border border-white/[0.08] bg-[#0d1117] rounded-full px-3 py-1 text-xs font-medium text-[#8b98a9] shadow-sm"
             role="status"
             aria-live="polite"
           >
@@ -583,7 +587,7 @@ export function App(): React.JSX.Element {
           <button
             type="button"
             onClick={() => setShowShortcutsModal(true)}
-            className="w-8 h-8 rounded-lg border border-neutral-800 bg-black hover:bg-[#2a3441] text-[#8b98a9] hover:text-white flex items-center justify-center text-xs font-mono transition-colors"
+            className="w-8 h-8 rounded-lg border border-white/[0.08] bg-[#0d1117] hover:bg-[#1f2937] text-[#8b98a9] hover:text-white flex items-center justify-center text-xs font-mono transition-colors shadow-sm"
             title="Keyboard shortcuts (?)"
             aria-label="Keyboard shortcuts"
           >
@@ -670,10 +674,11 @@ export function App(): React.JSX.Element {
 
             {/* Quick Starter Templates */}
             <div className="mt-3">
-              <div className="text-[11px] font-semibold text-[#8b98a9] uppercase tracking-wider mb-2">
-                Quick Starters
+              <div className="text-[10px] font-semibold text-[#8b98a9] uppercase tracking-wider mb-2 flex items-center justify-between">
+                <span>Quick Starters</span>
+                <span className="font-mono text-[9px] text-teal-400">Click to load</span>
               </div>
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-2 gap-2">
                 {STARTER_TEMPLATES.map((tmpl) => (
                   <button
                     key={tmpl.label}
@@ -682,9 +687,10 @@ export function App(): React.JSX.Element {
                       setTask(tmpl.task);
                       if (!repoUrl) setRepoUrl("https://github.com/cloudflare/ai-chat");
                     }}
-                    className="text-left text-[11px] px-2 py-1.5 rounded bg-black hover:bg-[#2a3441] text-[#e6edf3] border border-neutral-800 transition-colors truncate"
+                    className="text-left text-[11px] p-2 rounded-lg bg-[#0d1117] hover:bg-[#161d27] text-[#e6edf3] border border-white/[0.06] hover:border-teal-500/40 transition-all flex items-center gap-1.5 group shadow-sm"
                   >
-                    {tmpl.label}
+                    <span className="text-xs shrink-0">{tmpl.icon}</span>
+                    <span className="truncate group-hover:text-teal-300 transition-colors font-medium">{tmpl.label}</span>
                   </button>
                 ))}
               </div>
@@ -763,6 +769,34 @@ export function App(): React.JSX.Element {
 
         {/* MAIN CONTENT: Conversation & Runs */}
         <main className="flex-1 flex flex-col h-auto xl:h-[calc(100vh-3.5rem)] overflow-hidden bg-black">
+          {/* TOP METRICS SUMMARY RIBBON */}
+          <div className="border-b border-white/[0.08] bg-[#07090e]/60 px-6 py-2.5 flex items-center justify-between flex-wrap gap-3 text-xs shrink-0">
+            <div className="flex items-center gap-4 text-xs font-mono text-[#8b98a9]">
+              <div className="flex items-center gap-1.5">
+                <span className="text-neutral-500">Active Tasks:</span>
+                <span className="text-teal-400 font-bold">{toolRuns.length}</span>
+              </div>
+              <div className="w-px h-3.5 bg-white/[0.1]" />
+              <div className="flex items-center gap-1.5">
+                <span className="text-neutral-500">Pending Approvals:</span>
+                <span className={pendingApprovals.length > 0 ? "font-bold text-[#f59e0b]" : "font-bold text-neutral-400"}>
+                  {pendingApprovals.length}
+                </span>
+              </div>
+              <div className="w-px h-3.5 bg-white/[0.1] hidden sm:block" />
+              <div className="hidden sm:flex items-center gap-1.5">
+                <span className="text-neutral-500">Total Runs:</span>
+                <span className="text-white font-bold">{allRuns.length}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-wider font-mono text-teal-400/80 bg-teal-950/60 border border-teal-800/40 px-2 py-0.5 rounded">
+                Zero-Trust Boundary
+              </span>
+            </div>
+          </div>
+
           {/* TOP: PENDING APPROVALS ALERT */}
           {(pendingApprovals.length > 0 || approvalAnnouncement) ? (
             <div className="bg-[#090b0e] border-b border-neutral-800 px-6 xl:px-8 py-3.5 flex items-center justify-between shadow-sm z-10 shrink-0">
@@ -1026,7 +1060,7 @@ export function App(): React.JSX.Element {
                       const sColor = statusColors[run.status] || "text-[#8b98a9] border-neutral-800 bg-[#090b0e]";
 
                       return (
-                        <li key={run.runId} className="border border-neutral-800 rounded-xl p-4 bg-[#090b0e] shadow-sm">
+                        <li key={run.runId} className="border border-white/[0.08] rounded-xl p-4 bg-[#07090e] shadow-md">
                           <div className="flex items-start justify-between gap-3 mb-2">
                             <div className="flex items-center gap-2 min-w-0">
                               <span className="w-2 h-2 rounded-full bg-teal-400" />
@@ -1115,7 +1149,7 @@ export function App(): React.JSX.Element {
                       const repoName = parseRepoName(run.repoUrl);
 
                       return (
-                        <li key={run.runId} className="border border-neutral-800 rounded-xl bg-[#090b0e] overflow-hidden">
+                        <li key={run.runId} className="border border-white/[0.08] rounded-xl bg-[#07090e] overflow-hidden shadow-sm hover:border-white/[0.15] transition-colors">
                           <details className="group">
                             <summary
                               className="flex items-center justify-between p-4 cursor-pointer hover:bg-[#2a3441]/30 transition-colors select-none"

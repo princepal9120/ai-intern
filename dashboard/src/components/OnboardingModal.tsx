@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 
 export interface OnboardingModalProps {
   isOpen: boolean;
@@ -15,6 +15,7 @@ export interface SetupStep {
   detail: string;
   codeSnippet?: string;
   planRef: string;
+  docAnchor: string;
 }
 
 export const ONBOARDING_STEPS: SetupStep[] = [
@@ -36,6 +37,7 @@ export const ONBOARDING_STEPS: SetupStep[] = [
   "max_instances": 5
 }]`,
     planRef: "PLAN.md §5 (T1, T2)",
+    docAnchor: "2-infrastructure-setup-planmd-5-t1t2",
   },
   {
     id: "ai-gateway",
@@ -51,6 +53,7 @@ export const ONBOARDING_STEPS: SetupStep[] = [
 # 2. Anthropic (for Claude 3.7 / Sonnet 4.6)
 # 3. OpenAI (for Codex / GPT-4o / GPT-5)`,
     planRef: "PLAN.md §5 (T3, T4) & §8",
+    docAnchor: "3-ai-gateway--byok-keys-planmd-5--8",
   },
   {
     id: "access-bypass",
@@ -67,6 +70,7 @@ export const ONBOARDING_STEPS: SetupStep[] = [
 # In .dev.vars or Wrangler vars:
 REQUIRE_ACCESS=true`,
     planRef: "PLAN.md §6 (T7) & §9 (T12)",
+    docAnchor: "4-cloudflare-access--mandatory-webhook-bypasses-planmd-6--9",
   },
   {
     id: "github-token",
@@ -81,6 +85,7 @@ npx wrangler secret put GITHUB_TOKEN
 # Or for local testing in .dev.vars:
 GITHUB_TOKEN=ghp_yourTokenHere`,
     planRef: "PLAN.md §6 (T6)",
+    docAnchor: "5-github-token--scoped-permissions-planmd-6-t6",
   },
   {
     id: "slack-bot",
@@ -97,6 +102,7 @@ SLACK_APPROVERS=U01234567,U09876543
 # Optional default repo mapping for channels:
 SLACK_CHANNEL_REPOS=C04INCIDENTS:myorg/backend-api`,
     planRef: "PLAN.md §9 (T12, T15)",
+    docAnchor: "6-slack-bot-integration-planmd-9-optional",
   },
   {
     id: "first-run",
@@ -112,6 +118,7 @@ Base branch: main
 Coding agent harness: opencode (or claude-code / codex)
 Task: Fix lint errors and verify test suite runs cleanly.`,
     planRef: "PLAN.md §7 (T10)",
+    docAnchor: "7-first-acceptance-run-planmd-7-t10",
   },
 ];
 
@@ -137,6 +144,8 @@ export function OnboardingModal({
 
   const [expandedStep, setExpandedStep] = useState<string | null>("workers-paid");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "pending" | "completed">("all");
+  const modalTitleId = useId();
 
   useEffect(() => {
     try {
@@ -164,29 +173,44 @@ export function OnboardingModal({
   const completedCount = completedSteps.length;
   const progressPercent = Math.round((completedCount / totalSteps) * 100);
   const isAllComplete = completedCount === totalSteps;
+  const resetChecklist = () => {
+    setCompletedSteps(["workers-paid"]);
+    setExpandedStep("workers-paid");
+  };
+
+  const markAllComplete = () => {
+    setCompletedSteps(ONBOARDING_STEPS.map((s) => s.id));
+  };
+
+  const filteredSteps = ONBOARDING_STEPS.filter((step) => {
+    const isDone = completedSteps.includes(step.id);
+    if (filter === "pending") return !isDone;
+    if (filter === "completed") return isDone;
+    return true;
+  });
 
   return (
     <div
       className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="onboarding-modal-title"
+      aria-labelledby={modalTitleId}
     >
-      <div className="bg-[#090b0e] border border-neutral-800 rounded-2xl max-w-2xl w-full p-5 sm:p-7 shadow-2xl my-auto text-[#e6edf3]">
+      <div className="bg-[#090b0e] border border-neutral-800 rounded-2xl max-w-2xl w-full p-5 sm:p-7 shadow-2xl my-auto text-[#e6edf3] max-h-[90dvh] flex flex-col">
         {/* Modal Header */}
-        <div className="flex items-start justify-between gap-4 pb-4 border-b border-neutral-800">
+        <div className="flex items-start justify-between gap-4 pb-4 border-b border-neutral-800 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-teal-950/60 border border-teal-500/50 flex items-center justify-center text-xl shadow-[0_0_12px_rgba(11,159,149,0.3)]">
               🚀
             </div>
             <div>
-              <h2 id="onboarding-modal-title" className="text-lg font-bold text-white flex items-center gap-2">
+              <h2 id={modalTitleId} className="text-lg font-bold text-white flex items-center gap-2 text-balance">
                 Setup & Onboarding Guide
                 <span className="text-[10px] font-mono font-normal text-teal-400 bg-teal-950/60 border border-teal-800/60 px-2 py-0.5 rounded-full">
                   PLAN.md End-to-End
                 </span>
               </h2>
-              <p className="text-xs text-[#8b98a9] mt-0.5">
+              <p className="text-xs text-[#8b98a9] mt-0.5 text-pretty">
                 Everything required to deploy, secure, and run your self-hosted AI coding engineer.
               </p>
             </div>
@@ -202,21 +226,73 @@ export function OnboardingModal({
         </div>
 
         {/* Progress Tracker with Endowed Progress */}
-        <div className="py-4 border-b border-neutral-800/70">
+        <div className="py-3.5 border-b border-neutral-800/70 shrink-0">
           <div className="flex items-center justify-between text-xs mb-1.5">
             <span className="font-semibold text-white flex items-center gap-2">
               <span>Setup Progress</span>
-              <span className="text-[11px] font-mono text-teal-400 font-normal">
+              <span className="text-[11px] font-mono text-teal-400 font-normal tabular-nums">
                 {completedCount} of {totalSteps} steps completed
               </span>
             </span>
-            <span className="font-mono text-teal-400 font-bold">{progressPercent}%</span>
+            <span className="font-mono text-teal-400 font-bold tabular-nums">{progressPercent}%</span>
           </div>
           <div className="w-full bg-neutral-900 rounded-full h-2 overflow-hidden border border-neutral-800">
             <div
               className="bg-gradient-to-r from-teal-500 to-teal-300 h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_10px_rgba(99,200,193,0.5)]"
               style={{ width: `${progressPercent}%` }}
+              role="progressbar"
+              aria-valuenow={progressPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
             />
+          </div>
+
+          {/* Filter & Action Toolbar */}
+          <div className="flex items-center justify-between mt-3 text-xs flex-wrap gap-2">
+            <div className="inline-flex items-center p-0.5 bg-black rounded-lg border border-neutral-800 text-[11px] font-mono">
+              <button
+                type="button"
+                onClick={() => setFilter("all")}
+                className={`px-2.5 py-0.5 rounded-md transition-colors ${filter === "all" ? "bg-neutral-800 text-white font-semibold" : "text-[#8b98a9] hover:text-white"}`}
+              >
+                All ({totalSteps})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilter("pending")}
+                className={`px-2.5 py-0.5 rounded-md transition-colors ${filter === "pending" ? "bg-neutral-800 text-teal-300 font-semibold" : "text-[#8b98a9] hover:text-white"}`}
+              >
+                Pending ({totalSteps - completedCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilter("completed")}
+                className={`px-2.5 py-0.5 rounded-md transition-colors ${filter === "completed" ? "bg-neutral-800 text-teal-400 font-semibold" : "text-[#8b98a9] hover:text-white"}`}
+              >
+                Completed ({completedCount})
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 text-[11px] font-mono">
+              {!isAllComplete ? (
+                <button
+                  type="button"
+                  onClick={markAllComplete}
+                  className="text-[#8b98a9] hover:text-teal-300 transition-colors"
+                >
+                  Mark all done
+                </button>
+              ) : null}
+              {completedCount > 1 ? (
+                <button
+                  type="button"
+                  onClick={resetChecklist}
+                  className="text-[#8b98a9] hover:text-red-400 transition-colors"
+                >
+                  Reset
+                </button>
+              ) : null}
+            </div>
           </div>
           {isAllComplete ? (
             <div className="mt-3 text-xs bg-teal-950/40 border border-teal-500/40 text-teal-300 px-3 py-2 rounded-lg flex items-center justify-between">
@@ -240,8 +316,14 @@ export function OnboardingModal({
         </div>
 
         {/* Step-by-Step Checklist */}
-        <div className="py-3 flex flex-col gap-2.5 max-h-[50vh] overflow-y-auto pr-1">
-          {ONBOARDING_STEPS.map((step, idx) => {
+        <div className="py-3 flex flex-col gap-2.5 max-h-[55dvh] overflow-y-auto pr-1 flex-1 min-h-0">
+          {filteredSteps.length === 0 ? (
+            <div className="text-center py-8 text-xs text-[#8b98a9] border border-dashed border-neutral-800 rounded-xl">
+              No steps match this filter.
+            </div>
+          ) : (
+            filteredSteps.map((step) => {
+              const idx = ONBOARDING_STEPS.findIndex((s) => s.id === step.id);
             const isDone = completedSteps.includes(step.id);
             const isExpanded = expandedStep === step.id;
 
@@ -266,6 +348,8 @@ export function OnboardingModal({
                           ? "bg-teal-400 border-teal-400 text-black font-bold text-xs shadow-[0_0_8px_rgba(99,200,193,0.6)]"
                           : "border-neutral-700 bg-black hover:border-teal-500"
                       }`}
+                      role="checkbox"
+                      aria-checked={isDone}
                       aria-label={`Mark ${step.title} as ${isDone ? "incomplete" : "complete"}`}
                     >
                       {isDone ? "✓" : null}
@@ -307,7 +391,7 @@ export function OnboardingModal({
                     <div className="flex items-center justify-between text-[11px] font-mono text-[#8b98a9]">
                       <span>Source: <strong className="text-teal-400">{step.planRef}</strong></span>
                       <a
-                        href="/docs/onboarding/"
+                        href={`/docs/onboarding/#${step.docAnchor}`}
                         className="text-teal-400 hover:underline inline-flex items-center gap-1"
                       >
                         Read Onboarding Docs →
@@ -363,11 +447,12 @@ export function OnboardingModal({
                 ) : null}
               </div>
             );
-          })}
+            })
+          )}
         </div>
 
         {/* Modal Footer */}
-        <div className="pt-4 border-t border-neutral-800 flex items-center justify-between gap-3">
+        <div className="pt-3.5 border-t border-neutral-800 flex items-center justify-between gap-3 shrink-0 flex-wrap">
           <a
             href="/docs/onboarding/"
             className="text-xs text-teal-400 hover:underline font-mono inline-flex items-center gap-1"

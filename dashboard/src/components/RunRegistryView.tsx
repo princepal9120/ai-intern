@@ -39,8 +39,8 @@ export function RunRegistryView({
   const [expandedRunId, setExpandedRunId] = useState<string | null>(runs[0]?.runId || null);
 
   const statusColors: Record<string, string> = {
-    pending: "text-[#c9a227] border-[#c9a227]/30 bg-[#c9a227]/10",
-    running: "text-[#4f9cf0] border-[#4f9cf0]/30 bg-[#4f9cf0]/10",
+    pending: "text-[#f59e0b] border-[#f59e0b]/40 bg-[#f59e0b]/10",
+    running: "text-[#2dd4bf] border-[#0B9F95]/40 bg-[#0B9F95]/10",
     completed: "text-[#4cc38a] border-[#4cc38a]/30 bg-[#4cc38a]/10",
     error: "text-[#f06666] border-[#f06666]/30 bg-[#f06666]/10",
     aborted: "text-[#f06666] border-[#f06666]/30 bg-[#f06666]/10",
@@ -76,7 +76,7 @@ export function RunRegistryView({
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-black text-[#e6edf3]">
       {/* Top Header */}
-      <div className="border-b border-neutral-800 bg-[#090b0e] px-4 lg:px-8 py-4 flex flex-wrap items-center justify-between gap-4 shrink-0">
+      <div className="border-b border-white/[0.08] bg-[#07090e]/95 backdrop-blur-md px-4 lg:px-8 py-4 flex flex-wrap items-center justify-between gap-4 shrink-0">
         <div>
           <h2 className="text-base font-semibold text-white flex items-center gap-2">
             <span>Run Registry & Workspaces</span>
@@ -117,19 +117,19 @@ export function RunRegistryView({
       <div className="p-4 lg:p-8 flex-1 overflow-y-auto flex flex-col gap-6">
         {/* Quick Stats Metrics */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-[#090b0e] border border-neutral-800 rounded-xl p-3.5 flex flex-col gap-1">
+          <div className="bg-[#07090e] border border-white/[0.08] rounded-xl p-3.5 shadow-sm flex flex-col gap-1">
             <span className="text-[11px] font-mono text-[#8b98a9] uppercase">Total Runs</span>
             <span className="text-xl font-bold text-white font-mono">{stats.total}</span>
           </div>
-          <div className="bg-[#090b0e] border border-neutral-800 rounded-xl p-3.5 flex flex-col gap-1">
+          <div className="bg-[#07090e] border border-white/[0.08] rounded-xl p-3.5 flex flex-col gap-1">
             <span className="text-[11px] font-mono text-teal-400 uppercase">Active Now</span>
             <span className="text-xl font-bold text-teal-400 font-mono">{stats.active}</span>
           </div>
-          <div className="bg-[#090b0e] border border-neutral-800 rounded-xl p-3.5 flex flex-col gap-1">
+          <div className="bg-[#07090e] border border-white/[0.08] rounded-xl p-3.5 flex flex-col gap-1">
             <span className="text-[11px] font-mono text-[#4cc38a] uppercase">Completed</span>
             <span className="text-xl font-bold text-[#4cc38a] font-mono">{stats.completed}</span>
           </div>
-          <div className="bg-[#090b0e] border border-neutral-800 rounded-xl p-3.5 flex flex-col gap-1">
+          <div className="bg-[#07090e] border border-white/[0.08] rounded-xl p-3.5 flex flex-col gap-1">
             <span className="text-[11px] font-mono text-[#f06666] uppercase">Failed / Cancelled</span>
             <span className="text-xl font-bold text-[#f06666] font-mono">{stats.error}</span>
           </div>
@@ -137,7 +137,7 @@ export function RunRegistryView({
 
         {/* Filter Controls & Search */}
         <div className="flex flex-wrap items-center justify-between gap-3 bg-[#090b0e] p-3 rounded-xl border border-neutral-800">
-          <div className="flex items-center gap-1 bg-black p-1 rounded-lg border border-neutral-800 text-xs">
+          <div className="flex items-center gap-1 bg-[#0d1117] p-1 rounded-lg border border-white/[0.08] text-xs">
             {(["all", "active", "completed", "error"] as const).map((tab) => (
               <button
                 key={tab}

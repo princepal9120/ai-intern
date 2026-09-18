@@ -250,5 +250,10 @@ describe("dashboard rendering", () => {
     expect(markup).toContain("Cloudflare Access &amp; Webhook Bypass Policies");
     expect(markup).toContain("GitHub Personal Access Token &amp; Repo Scoping");
     expect(markup).toContain("First Live Run &amp; Approval Gate");
+    expect(markup).toContain("All (6)");
+    expect(markup).toContain("Pending (5)");
+    expect(markup).toContain("Completed (1)");
+    expect(markup).toContain('role="progressbar"');
+    expect(markup).toContain('role="checkbox"');
   });
 });
