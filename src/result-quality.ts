@@ -49,7 +49,8 @@ function readScoreBody(raw: unknown): { score: number; confidence: number } | nu
 
 function levelFromScore(score: number): QualityLevel {
   const idx = Math.max(0, Math.min(QUALITY_LEVELS.length - 1, Math.round(score)));
-  return QUALITY_LEVELS[idx];
+  // idx is clamped to [0, QUALITY_LEVELS.length-1] by Math.max/min above
+  return QUALITY_LEVELS[idx] as QualityLevel;
 }
 
 /**

@@ -25,6 +25,9 @@ A user must be able to:
 9. Watch a Cloudflare Agent delegate the task to an isolated Cloudflare Sandbox container.
 10. See OpenCode progress, changed files, and a unified diff.
 11. Optionally request a branch and pull request when a GitHub token is configured.
+12. Optionally configure a Slack app: mention @ai-intern in any thread to start a task. The bot posts an approval card in-thread before any container starts; only SLACK_APPROVERS can approve from Slack.
+13. Use the /ai-intern slash command to start a task from Slack without an existing thread.
+14. Create automations with schedule (cron), GitHub event, Slack, webhook, or manual triggers. Each automation has an optional run_when plain-language condition (evaluated by TypeSafe Noul when TYPESAFE_API_KEY is set, else Workers AI). Automated runs require approval by default; opt-in unattended mode is available only for pull-request-only mutations on an explicit repo allowlist.
 
 The dashboard is one inbound surface of two. Slack (`@ai-intern` mentions and `/ai-intern`) is a supported entry point: thread prose is turned into structured `delegate_coding_task` by the orchestrator LLM. Prose never crosses the child boundary (`parseAgentToolInput`). Slack approvals require `SLACK_APPROVERS`; an empty list means nobody can approve from Slack.
 

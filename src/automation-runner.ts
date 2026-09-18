@@ -192,7 +192,7 @@ export async function fireAutomation(
       publishPullRequest: true,
       threadKey,
     });
-    let next = recordTrigger(automation, nowMs);
+    const next = recordTrigger(automation, nowMs);
     if (!auth.requiresApproval) {
       if (!deps.resolveApproval) {
         const skipped = recordSkip(
