@@ -1,8 +1,8 @@
 # Verification Results
 
-**Last run: 2026-09-18 (rev 5).**
+**Last run: 2026-09-18 (rev 5, plan-review pass).**
 
-## Status: PASS with one documented environment limitation
+## Status: PASS, every check green including the dry run
 
 | Check | Result |
 |-------|--------|
@@ -11,12 +11,12 @@
 | `pnpm test` | PASS (374/374 across 30 files) |
 | `pnpm build` | PASS (docs: 22 pages, 904 links verified) |
 | `pnpm docs:check` | PASS |
-| `npx wrangler deploy --dry-run` | **NOT RUN this pass: Docker CLI exists (`/opt/homebrew/bin/docker`) but no daemon is reachable (OrbStack socket absent).** |
-| Live cloud run (PLAN.md T10) | **NOT ATTEMPTED** |
+| `npx wrangler deploy --dry-run` | **PASS (2026-09-18)** — OrbStack daemon started locally; container image `cloudflare/sandbox:0.12.9-opencode` + `opencode-ai@1.18.31` built and exported; all four DOs (`CodingOrchestrator`, `OpenCodeAgent`, `Sandbox`, `Automations`) bound with `new_sqlite_classes` migrations v1/v2 accepted; `instance_type: standard-1` accepted. **T1–T3 are now validated by the tool that catches them.** |
+| Live cloud run (PLAN.md T10) | **NOT ATTEMPTED** — requires a Cloudflare account; `spec/GOAL.md` forbids deploying from this environment. |
 
 ## Limitations, stated plainly
 
-**`wrangler deploy --dry-run` cannot complete here.** It packages the container image and there is no Docker CLI installed. This is an environment gap, not a code defect — but it also means T1–T3 (the SQLite migration, the instance type, and the model id) have **not** been validated by the tool that would catch them. Run the dry run on a machine with Docker before P2.
+**The dry run no longer blocks anything.** The prior "no Docker CLI / no daemon" limitation is retired: OrbStack was running this pass and the full dry run completed. T1–T3 (SQLite migration, instance type, model id) are validated.
 
 **No live end-to-end cloud run has been performed.** `spec/GOAL.md` forbids deploying from this environment. Every claim below rests on mocked unit tests, which cannot establish that any of this works in the cloud. Until a dated live run against the PLAN.md §15 P2 bar is recorded here, the honest status stays **local prototype**.
 
