@@ -12,6 +12,8 @@ export interface Env {
   CodingOrchestrator: DurableObjectNamespace<CodingOrchestrator>;
   OpenCodeAgent: DurableObjectNamespace<OpenCodeAgent>;
   Sandbox: DurableObjectNamespace<Sandbox>;
+  /** Bound to the Automations Durable Object class in wrangler.jsonc. */
+  Automations: DurableObjectNamespace;
   ASSETS: Fetcher;
   /** AI Gateway id. Default "default". */
   GATEWAY_ID: string;
@@ -38,6 +40,10 @@ export interface Env {
   SLACK_APPROVERS?: string;
   /** Optional. Bot token used only to post approval cards (chat.postMessage). */
   SLACK_BOT_TOKEN?: string;
+  /** Optional. JSON map `{channelId: "https://github.com/owner/repo"}` for bare mentions. */
+  SLACK_CHANNEL_REPOS?: string;
+  /** Optional. TypeSafe System One key for `run_when`; unset falls back to Workers AI. */
+  TYPESAFE_API_KEY?: string;
   /** Optional. Required only to open pull requests. Never sent to containers. */
   GITHUB_TOKEN?: string;
   /** Optional. Server-side credential for AI Gateway. Never sent to containers. */

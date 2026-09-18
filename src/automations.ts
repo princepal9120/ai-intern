@@ -3,9 +3,8 @@
  *
  * Capy's model: 1–20 triggers OR'd together, at most one run per event.
  * An automation holds `{id, prompt, triggers[], repoUrl, enabled, runAs,
- * lastTriggeredAt, runCount}`; a future `Automations` Durable Object will
- * own these records and a `scheduled()` Worker entrypoint will fan out due
- * schedules via {@link collectDueSchedules}.
+ * lastTriggeredAt, runCount}`. The `Automations` Durable Object owns these
+ * records; Worker `scheduled()` fans out due schedules via {@link collectDueSchedules}.
  *
  * Trigger kinds:
  * - schedule — five-field cron, floor of one run per 5 minutes (matching
@@ -593,6 +592,14 @@ export interface RunWhenVerdict {
   reason: string;
 }
 
+export const TYPESAFE_SYSTEMONE_URL = "https://api.typesafe.ai/v1/systemone";
+/** Noul near 0.5 is a coin flip — require a clear yes. */
+export const TYPESAFE_NOUL_YES_THRESHOLD = 0.8;
+
+export interface TypeSafeNoulFetch {
+  (input: string | URL, init?: RequestInit): Promise<Response>;
+}
+
 function readModelAnswer(raw: unknown): string | null {
   if (typeof raw === "string") return raw;
   if (typeof raw === "object" && raw !== null) {
@@ -602,17 +609,77 @@ function readModelAnswer(raw: unknown): string | null {
   return null;
 }
 
+function readNoul(raw: unknown): number | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const answers = (raw as { answers?: unknown }).answers;
+  if (typeof answers !== "object" || answers === null) return null;
+  const match = (answers as { match?: unknown }).match;
+  if (typeof match !== "object" || match === null) return null;
+  const noul = (match as { noul?: unknown }).noul;
+  return typeof noul === "number" && Number.isFinite(noul) ? noul : null;
+}
+
 /**
- * T19. Asks the cheap orchestrator model whether `runWhen` holds for this
- * event. Fails closed: a model error, an empty answer, or anything not
- * clearly affirmative means no run, with the reason carried back.
+ * Optional TypeSafe Noul path. Fail closed on HTTP/parse errors and on noul < 0.8.
+ */
+export async function evaluateRunWhenTypeSafe(
+  apiKey: string,
+  runWhen: string,
+  eventSummary: string,
+  fetchImpl: TypeSafeNoulFetch = fetch,
+): Promise<RunWhenVerdict> {
+  try {
+    const response = await fetchImpl(TYPESAFE_SYSTEMONE_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        state: { condition: runWhen, event: eventSummary },
+        model: "jev-latest",
+        questions: {
+          match: {
+            type: "noul",
+            instructions: "Does `condition` clearly hold for `event`?",
+          },
+        },
+      }),
+    });
+    if (!response.ok) {
+      return { run: false, reason: `run_when gate failed closed: TypeSafe HTTP ${response.status}` };
+    }
+    const body: unknown = await response.json();
+    const noul = readNoul(body);
+    if (noul === null) {
+      return { run: false, reason: "run_when gate failed closed: TypeSafe returned no noul." };
+    }
+    if (noul >= TYPESAFE_NOUL_YES_THRESHOLD) {
+      return { run: true, reason: `run_when matched: ${runWhen}` };
+    }
+    return { run: false, reason: `run_when did not match: ${runWhen}` };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return { run: false, reason: `run_when gate failed closed: ${detail}` };
+  }
+}
+
+/**
+ * T19. TypeSafe Noul when `typeSafeApiKey` is set; otherwise Workers AI YES/NO.
+ * Fails closed: error, empty answer, or anything not clearly yes means no run.
  */
 export async function evaluateRunWhen(
   ai: RunWhenAi,
   model: string,
   runWhen: string,
   eventSummary: string,
+  typeSafeApiKey?: string,
+  fetchImpl: TypeSafeNoulFetch = fetch,
 ): Promise<RunWhenVerdict> {
+  const key = typeSafeApiKey?.trim() ?? "";
+  if (key) {
+    return evaluateRunWhenTypeSafe(key, runWhen, eventSummary, fetchImpl);
+  }
   let answer: string | null;
   try {
     const raw = await ai.run(model, {
@@ -730,9 +797,9 @@ export function parseAutomationWebhookPath(pathname: string): string | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Minimal in-memory store behind the future `Automations` Durable Object,
- * which will hold `{id, prompt, triggers[], repoUrl, enabled, runAs,
- * lastTriggeredAt, runCount}` per automation in DO state.
+ * In-memory store used by the `Automations` Durable Object, which holds
+ * `{id, prompt, triggers[], repoUrl, enabled, runAs, lastTriggeredAt,
+ * runCount}` per automation in DO state.
  */
 export class AutomationStore {
   private readonly items = new Map<string, Automation>();

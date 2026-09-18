@@ -25,11 +25,15 @@
   "ai": {
     "binding": "AI",
   },
+  "triggers": {
+    "crons": ["*/5 * * * *"],
+  },
   "durable_objects": {
     "bindings": [
       { "name": "CodingOrchestrator", "class_name": "CodingOrchestrator" },
       { "name": "OpenCodeAgent", "class_name": "OpenCodeAgent" },
       { "name": "Sandbox", "class_name": "Sandbox" },
+      { "name": "Automations", "class_name": "Automations" },
     ],
   },
   "containers": [
@@ -41,5 +45,8 @@
       "max_instances": 5,
     },
   ],
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CodingOrchestrator", "OpenCodeAgent", "Sandbox"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["CodingOrchestrator", "OpenCodeAgent", "Sandbox"] },
+    { "tag": "v2", "new_sqlite_classes": ["Automations"] },
+  ],
 }

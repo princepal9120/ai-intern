@@ -5,6 +5,7 @@ import {
   collectDueSchedules,
   createAutomation,
   evaluateRunWhen,
+  evaluateRunWhenTypeSafe,
   isScheduleDue,
   matchAutomationEvent,
   matchGitHubTrigger,
@@ -296,6 +297,33 @@ describe("run_when gate (T19)", () => {
   it("records a skip so the reason is never silent", () => {
     const skipped = recordSkip(manualAutomation(), "run_when did not match", 4242);
     expect(skipped.lastSkip).toEqual({ at: 4242, reason: "run_when did not match" });
+  });
+
+  it("uses TypeSafe Noul when a key is set and noul is high", async () => {
+    const fetchImpl = async () =>
+      new Response(JSON.stringify({ answers: { match: { type: "noul", noul: 0.91 } } }), { status: 200 });
+    const ai = stubAi({ response: "NO" });
+    const verdict = await evaluateRunWhen(ai, MODEL, "it is a bug report", "500s", "ts-key", fetchImpl);
+    expect(verdict.run).toBe(true);
+  });
+
+  it("fails closed on TypeSafe noul below threshold", async () => {
+    const fetchImpl = async () =>
+      new Response(JSON.stringify({ answers: { match: { type: "noul", noul: 0.4 } } }), { status: 200 });
+    const verdict = await evaluateRunWhenTypeSafe("ts-key", "bug", "newsletter", fetchImpl);
+    expect(verdict.run).toBe(false);
+    expect(verdict.reason).toContain("did not match");
+  });
+
+  it("fails closed on TypeSafe HTTP or parse errors", async () => {
+    const http = await evaluateRunWhenTypeSafe("ts-key", "bug", "ev", async () => new Response("no", { status: 500 }));
+    expect(http.run).toBe(false);
+    expect(http.reason).toContain("failed closed");
+    const bad = await evaluateRunWhenTypeSafe("ts-key", "bug", "ev", async () =>
+      new Response(JSON.stringify({ answers: {} }), { status: 200 }),
+    );
+    expect(bad.run).toBe(false);
+    expect(bad.reason).toContain("no noul");
   });
 });
 

@@ -21,10 +21,8 @@ export interface SnapshotFileOps {
   ): Promise<{ kind: "utf8" | "base64"; content: string }>;
 }
 
-export interface SnapshotBucket {
-  put(key: string, value: string): Promise<unknown>;
-  get(key: string): Promise<{ text(): Promise<string> } | null>;
-}
+/** R2 `put`/`get` is enough; keep this narrow so Env.SNAPSHOTS assigns cleanly. */
+export type SnapshotBucket = Pick<R2Bucket, "put" | "get">;
 
 export function snapshotObjectKey(runId: string, at: number = Date.now()): string {
   const safe = runId.replace(/[^A-Za-z0-9._:-]/g, "_").slice(0, 180);

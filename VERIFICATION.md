@@ -8,7 +8,7 @@
 |-------|--------|
 | `pnpm typecheck` | PASS |
 | `pnpm lint` | PASS |
-| `pnpm test` | PASS (319/319 across 27 files) |
+| `pnpm test` | PASS (333/333 across 28 files) |
 | `pnpm build` | PASS (docs: 22 pages, 913 links verified) |
 | `pnpm docs:check` | PASS |
 | `npx wrangler deploy --dry-run` | **NOT RUN this pass: Docker CLI exists (`/opt/homebrew/bin/docker`) but no daemon is reachable (OrbStack socket absent).** |
@@ -24,18 +24,18 @@ Specifically unmeasured: peak container memory (which decides `basic` vs `standa
 
 **The Claude Code and Codex harnesses are not runnable from the shipped image.** The Dockerfile installs `opencode-ai` only. Their config, argv, env, and event parsers are unit-tested; neither has been run against a live CLI, so their stream formats are asserted from documentation, not observation. Setting `AGENT_HARNESS=claude-code` or `codex` today fails at exec.
 
-## What the 269 tests do cover
+## What the 333 tests do cover
 
 - **Egress credential boundary.** `github.com` defaults to refusal; the credential is attached only for the run's own `/owner/repo`, with prefix-confusion siblings (`/owner/repo-evil`) and non-GitHub destinations refused, and no `Authorization` header reaching a refused request. The scope is proven to be installed *before* the clone, not after.
 - **Automation safety.** Approval required by default; unattended mode refused for a non-allowlisted repo and for any run mutating more than a pull request; the daily budget refusing run N+1 with its reason and resetting on the next UTC day; both kill switches.
-- **The `run_when` gate failing closed** on a model error, an empty answer, and an unparseable answer.
+- **The `run_when` gate failing closed** on a model error, an empty answer, an unparseable answer, TypeSafe HTTP/parse errors, and noul below 0.8.
 - **Harness isolation.** Each harness's `allowedHosts` contains only its own provider host plus git, never another harness's; every harness passes the container the dummy key and nothing matching a real credential shape; OpenCode's argv, config path, config contents, and env are pinned byte for byte against the pre-T22 behavior.
 - Run result envelope parsing (an `error` envelope never reads `completed`), Slack signature verification and replay bounds, approver allowlisting, burst grouping, cron parsing and coalescing, GitHub tree publishing including deletions.
 
 ## Fix history
 
 **2026-09-18 (review-findings pass)**
-- Slack approval lane closed end to end: POST /api/runs queues a durable pending approval in the orchestrator DO (frozen delegation input, 30-min TTL, resolve-exactly-once, non-object bodies rejected at the route); the slash-command reply carries the Block Kit card; /api/slack/interact dispatches allowlisted clicks to the shared orchestrator (previously fail-closed). Mention dispatch via /api/slack/events remains unshipped (acks + dedupes only).
+- Slack approval lane closed end to end: POST /api/runs queues a durable pending approval in the orchestrator DO (frozen delegation input, 30-min TTL, resolve-exactly-once, non-object bodies rejected at the route). Slash-command replies and `@mention` cards (`SLACK_BOT_TOKEN`) both carry Block Kit; `/api/slack/interact` resolves on the pointer `threadKey` DO (`default` for slash, `slack:{team}:{channel}:{thread_ts}` for mentions). Empty bot token: no mention card and no run. Repo: GitHub URL, else `SLACK_CHANNEL_REPOS`, else an in-thread ask.
 - Run lifecycle: 30-minute deadline reclaim (reclaim-on-access), cancellation propagation via per-run AbortController, terminal runs immutable, sandbox destroyed on cancel/reclaim/finish.
 - Capture integrity: oversized trees fail the run instead of publishing a partial PR; `..` now rejected as a whole path segment only.
 - Dead cron trigger removed from wrangler.jsonc (finding #4); dashboard identity via /api/whoami (finding #5).

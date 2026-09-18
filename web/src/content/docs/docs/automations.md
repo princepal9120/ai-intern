@@ -21,9 +21,9 @@ Automations support up to 20 triggers evaluated together (`OR` semantics). When 
 
 ---
 
-## Status: trigger engine only
+## Status: fire path is shipped
 
-The trigger engine (`src/automations.ts`) is implemented and unit-tested, but **no scheduler ships yet**: `wrangler.jsonc` has no `triggers.crons` and the Worker has no `scheduled()` handler, and there is no Automations Durable Object or API to create automation records yet. Nothing fires on its own. The sections below describe the designed behavior for when the runner is built — not what the deployed Worker does today.
+The trigger engine (`src/automations.ts`) is wired to a production runner (`src/automation-runner.ts`) and an `Automations` Durable Object. Cloudflare Triggers fire `*/5 * * * *`; the Worker `scheduled()` handler ticks due schedules. Verified GitHub webhooks and `POST /api/automations/{id}/trigger` (per-automation secret) fan out through the same gate: match → optional TypeSafe/`run_when` → T20 safety → queue an approval (or auto-approve only when unattended is granted). Create records with `POST /api/automations`.
 
 ---
 

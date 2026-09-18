@@ -7,15 +7,19 @@ import { ContainerProxy, proxyToSandbox, type Sandbox as SandboxBinding } from "
 import { getAgentByName, routeAgentRequest } from "agents/routing";
 import { OpenCodeAgent } from "./agents/opencode-agent.js";
 import { CodingOrchestrator } from "./agents/orchestrator.js";
+import { AUTOMATIONS_DO_NAME } from "./automation-runner.js";
+import { Automations } from "./automations-do.js";
+import { parseAutomationWebhookPath } from "./automations.js";
 import { assertLiveCodingModel } from "./coding-model.js";
 import type { Env } from "./env.js";
 import { Sandbox } from "./sandbox.js";
 import { redactSecrets, verifyGitHubWebhookSignature } from "./security.js";
 import { handleSlackInteract } from "./slack-approval.js";
 import { handleSlackEvents } from "./slack-events.js";
+import { handleSlackEvent } from "./slack-mention.js";
 import { ORCHESTRATOR_NAME, handleSlackCommand } from "./slack-routes.js";
 
-export { CodingOrchestrator, OpenCodeAgent, Sandbox, ContainerProxy };
+export { Automations, CodingOrchestrator, OpenCodeAgent, Sandbox, ContainerProxy };
 export { assertLiveCodingModel } from "./coding-model.js";
 
 export function getUserId(request: Request): string | null {
@@ -27,26 +31,40 @@ export function getUserId(request: Request): string | null {
 }
 
 // Only these exact callbacks use signatures instead of an Access identity.
-export const SIGNATURE_AUTHENTICATED = ["/api/slack/events", "/api/slack/command", "/api/slack/interact", "/api/github/webhook"];
+export const SIGNATURE_AUTHENTICATED = [
+  "/api/slack/events",
+  "/api/slack/command",
+  "/api/slack/interact",
+  "/api/github/webhook",
+];
+
+function isAutomationWebhookPath(pathname: string): boolean {
+  return parseAutomationWebhookPath(pathname) !== null;
+}
 
 
 
 export function isAuthenticated(request: Request, env: Env): boolean {
   const { pathname } = new URL(request.url);
   if (SIGNATURE_AUTHENTICATED.includes(pathname)) return true;
+  if (isAutomationWebhookPath(pathname)) return true;
   if (!env.REQUIRE_ACCESS) return true; // opt-out for `wrangler dev`
   return getUserId(request) !== null;
 }
 
+function automationsStub(env: Env) {
+  return env.Automations.get(env.Automations.idFromName(AUTOMATIONS_DO_NAME));
+}
+
 async function handleRuns(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
-  if (!/^\/api\/runs(?:\/[^/]+)?$/.test(url.pathname)) {
+  if (!/^\/api\/runs(?:\/[^/]+(?:\/(?:stop|resume|fork))?)?$/.test(url.pathname)) {
     return null;
   }
   if (!isAuthenticated(request, env)) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
-  if (request.method !== "GET" && request.method !== "DELETE") {
+  if (request.method !== "GET" && request.method !== "DELETE" && request.method !== "POST") {
     return Response.json({ error: "Method not allowed." }, { status: 405 });
   }
   // Local development shares the same fallback as the dashboard identity endpoint.
@@ -56,7 +74,7 @@ async function handleRuns(request: Request, env: Env): Promise<Response | null> 
   return stub.fetch(rewritten);
 }
 
-async function handleGitHubWebhook(request: Request, env: Env): Promise<Response | null> {
+async function handleGitHubWebhook(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response | null> {
   const url = new URL(request.url);
   if (url.pathname !== "/api/github/webhook" || request.method !== "POST") {
     return null;
@@ -80,17 +98,61 @@ async function handleGitHubWebhook(request: Request, env: Env): Promise<Response
   } catch {
     return Response.json({ error: "Webhook payload is not valid JSON." }, { status: 400 });
   }
+  const githubEvent = request.headers.get("x-github-event") ?? "unknown";
   const action = typeof event === "object" && event !== null
     ? (event as { action?: unknown }).action
     : undefined;
+  const waitUntil = ctx?.waitUntil?.bind(ctx);
+  if (waitUntil) {
+    waitUntil(
+      automationsStub(env)
+        .fetch(
+          new Request("https://internal/internal/github", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ event: githubEvent, payload: event }),
+          }),
+        )
+        .then((response) => {
+          if (!response.ok) {
+            console.error(`automation github fan-out failed: ${response.status}`);
+          }
+        })
+        .catch((error: unknown) => {
+          console.error(redactSecrets(error instanceof Error ? error.message : String(error)));
+        }),
+    );
+  }
   return Response.json({
     ok: true,
-    event: request.headers.get("x-github-event") ?? "unknown",
+    event: githubEvent,
     action: typeof action === "string" ? action : null,
   });
 }
 
+async function handleAutomations(request: Request, env: Env): Promise<Response | null> {
+  const url = new URL(request.url);
+  if (url.pathname === "/api/automations" || isAutomationWebhookPath(url.pathname)) {
+    return automationsStub(env).fetch(request);
+  }
+  return null;
+}
+
 export default {
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      automationsStub(env)
+        .fetch(new Request("https://internal/internal/tick", { method: "POST" }))
+        .then((response) => {
+          if (!response.ok) {
+            console.error(`automation tick failed: ${response.status}`);
+          }
+        })
+        .catch((error: unknown) => {
+          console.error(redactSecrets(error instanceof Error ? error.message : String(error)));
+        }),
+    );
+  },
   async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     try {
       const url = new URL(request.url);
@@ -124,7 +186,30 @@ export default {
       if (runsResponse) {
         return runsResponse;
       }
-      const slackEventsResponse = await handleSlackEvents(request, env, ctx ?? { waitUntil: () => {} } as unknown as ExecutionContext);
+      const slackEventsResponse = await handleSlackEvents(
+        request,
+        env,
+        ctx ?? { waitUntil: () => {} } as unknown as ExecutionContext,
+        {
+          onEvent: async (body, eventEnv) => {
+            await handleSlackEvent(body, eventEnv);
+            try {
+              const response = await automationsStub(eventEnv).fetch(
+                new Request("https://internal/internal/slack", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(body),
+                }),
+              );
+              if (!response.ok) {
+                console.error(`automation slack fan-out failed: ${response.status}`);
+              }
+            } catch (error: unknown) {
+              console.error(redactSecrets(error instanceof Error ? error.message : String(error)));
+            }
+          },
+        },
+      );
       if (slackEventsResponse) {
         return slackEventsResponse;
       }
@@ -132,16 +217,18 @@ export default {
       if (slackResponse) {
         return slackResponse;
       }
-      // Durable persistence is live (queue writes the approval record before
-      // acking; the DO re-validates pending+TTL on resolve), so clicks dispatch
-      // to the shared orchestrator instead of failing closed.
+      // Pointer.threadKey names the DO that queued the card (slash = default).
       const slackInteractResponse = await handleSlackInteract(request, env, {
-        orchestratorStub: await getAgentByName(env.CodingOrchestrator, ORCHESTRATOR_NAME),
+        resolveOrchestrator: (threadKey) => getAgentByName(env.CodingOrchestrator, threadKey || ORCHESTRATOR_NAME),
       }, ctx ? { waitUntil: (promise) => ctx.waitUntil(promise) } : undefined);
       if (slackInteractResponse) {
         return slackInteractResponse;
       }
-      const webhookResponse = await handleGitHubWebhook(request, env);
+      const automationsResponse = await handleAutomations(request, env);
+      if (automationsResponse) {
+        return automationsResponse;
+      }
+      const webhookResponse = await handleGitHubWebhook(request, env, ctx);
       if (webhookResponse) {
         return webhookResponse;
       }

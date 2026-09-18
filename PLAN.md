@@ -54,17 +54,17 @@
 
 ### 2.0 Status as of rev 4 (2026-09-17)
 
-Baseline: **269 tests passing across 21 files**, typecheck and lint clean. Rev 3's "111/111" is stale everywhere it appears below.
+Baseline: **333 tests passing across 28 files**, typecheck and lint clean. Earlier counts ("269/21", "111/111") are stale everywhere they appear below.
 
 | Task | State |
 |---|---|
 | T1 SQLite migration · T2 instance type · T3 live model id · T4 delete dead provider path | **Done.** |
 | T5 egress allowlist · T7 Access gating · T8 result envelope · T9 progress streaming · T11 sleep tail | **Done.** |
-| T12–T17 Slack: command lane shipped (queue → approval card in reply → allowlisted click → DO resolve → frozen input runs); mention dispatch and bot-token card posting **not shipped** — events endpoint acks + dedupes only | **Partial.** |
+| T12–T17 Slack: command + mention lanes shipped (queue → approval card → allowlisted click → thread-keyed DO resolve → frozen input runs). Empty `SLACK_BOT_TOKEN` = no mention card and no run. | **Done in code.** Live workspace still unverified (T10). |
 | T18 automations trigger engine · T21 harness seam | **Done.** |
 | T24 README · T25 deploy button · T26 pins | **Done.** |
 | **T6 scoped GitHub credential** | **Done in rev 4.** `github.com` now defaults to *refusal*; `approveRepoScope("/owner/repo")` installs the scoped forwarder before the clone. Stricter than this plan's sketch, which left the open forwarder as the default. Handlers moved to `src/egress.ts` — `src/sandbox.ts` imports `cloudflare:` builtins and cannot load under vitest, which is why this code was previously untested. |
-| **T19 `run_when` gate · T20 automation safety** | **Done in rev 4.** Gate fails closed. Approval by default, narrow opt-in unattended mode, daily budget, two kill switches. |
+| **T19 `run_when` gate · T20 automation safety** | **Done.** TypeSafe Noul when `TYPESAFE_API_KEY` is set (noul ≥ 0.8 to run), else Workers AI YES/NO; both fail closed. Approval by default, narrow opt-in unattended mode, daily budget, two kill switches. |
 | **B10 concurrency** | **Fixed in rev 4.** `MAX_CONCURRENT_RUNS` was still 3 while `max_instances` was already 5 — T2 had only been half-applied. |
 | **T22 Claude Code / Codex adapters · T23 provider choice (B11)** | **Done in rev 4.** The seam had to widen first: `configPath` and the container env were still OpenCode-hardcoded in `runtime.ts`, so a second harness could not have worked. `AgentHarness` now owns `supportedProviders`, `egressHosts(model)`, `configFile()`, and `env()`. `allowedHosts` is narrowed per run via `approveHarnessEgress` to the selected harness's provider host plus git — never the union. **Caveat: neither new CLI is in the shipped image**, so both are unit-tested and unproven live. |
 | **T10 live acceptance run** | **Blocked, not skipped.** No Docker CLI here and `spec/GOAL.md` forbids deploying. `wrangler deploy --dry-run` therefore still cannot validate T1–T3. |
@@ -558,11 +558,11 @@ Cron needs a `"triggers": { "crons": [...] }` block in `wrangler.jsonc` and a `s
 
 ### T19 · The `run_when` fuzzy gate (~2h)
 
-Exact filters cannot express *"only when it's actually a bug report"*. A `run_when` sentence on a trigger is checked by a fast model before the run starts.
+Exact filters cannot express *"only when it's actually a bug report"*. A `run_when` sentence on a trigger is checked before the run starts.
 
-**You already bind this.** `ORCHESTRATOR_MODEL` is `@cf/meta/llama-3.1-8b-instruct` on the Workers AI binding — a single cheap call, no AI Gateway round trip, no token bill against the user's provider key.
+When `TYPESAFE_API_KEY` is set, TypeSafe System One Noul decides (`noul ≥ 0.8` to run). Otherwise `ORCHESTRATOR_MODEL` (`@cf/meta/llama-3.1-8b-instruct` on Workers AI) answers YES/NO. Both paths **fail closed**.
 
-**Tests:** a matching event passes; a non-matching one records a skip with its reason; a model failure **fails closed** (no run) and surfaces, rather than silently firing.
+**Tests:** a matching event passes; a non-matching one records a skip with its reason; a model/HTTP/parse failure **fails closed** (no run) and surfaces, rather than silently firing. TypeSafe noul below 0.8 skips.
 
 ### T20 · Automation safety (~4h)
 

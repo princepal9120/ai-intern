@@ -45,6 +45,8 @@ export interface SlackApprovalDeps {
   respond?: (responseUrl: string, text: string) => Promise<void>;
   /** Fallback when no dispatch callbacks are injected. */
   orchestratorStub?: { fetch: (request: Request) => Promise<Response> };
+  /** Resolve the DO that owns this pointer; mention cards live on thread DOs. */
+  resolveOrchestrator?: (threadKey: string) => Promise<{ fetch: (request: Request) => Promise<Response> }>;
 }
 
 export interface ExecutionContextLike {
@@ -290,19 +292,19 @@ export async function handleSlackInteract(
   }
 
   const approved = interaction.actionId === APPROVE_ACTION_ID;
+  const stubFor = async (pointer: ApprovalPointer) => {
+    if (deps.resolveOrchestrator) return deps.resolveOrchestrator(pointer.threadKey);
+    if (deps.orchestratorStub) return deps.orchestratorStub;
+    throw new Error("Approval dispatch is not configured.");
+  };
   const dispatchApprove = deps.dispatchApprove ??
-    (deps.orchestratorStub
-      ? (pointer: ApprovalPointer, userId: string) =>
-        dispatchToOrchestrator(deps.orchestratorStub as { fetch: (r: Request) => Promise<Response> }, pointer, true, userId)
-      : undefined);
+    (async (pointer: ApprovalPointer, userId: string) =>
+      dispatchToOrchestrator(await stubFor(pointer), pointer, true, userId));
   const dispatchReject = deps.dispatchReject ??
-    (deps.orchestratorStub
-      ? (pointer: ApprovalPointer, userId: string) =>
-        dispatchToOrchestrator(deps.orchestratorStub as { fetch: (r: Request) => Promise<Response> }, pointer, false, userId)
-      : undefined);
+    (async (pointer: ApprovalPointer, userId: string) =>
+      dispatchToOrchestrator(await stubFor(pointer), pointer, false, userId));
   const work = (async () => {
     const dispatch = approved ? dispatchApprove : dispatchReject;
-    if (!dispatch) throw new Error("Approval dispatch is not configured.");
     await dispatch(interaction.pointer, interaction.userId);
   })();
   // The ack already went out, so a dispatch failure must surface to the human

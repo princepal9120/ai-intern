@@ -267,6 +267,26 @@ describe("handleSlackInteract", () => {
     expect(forwarded.url).toBe("https://internal/api/approvals");
   });
 
+  it("resolveOrchestrator routes the click to the pointer threadKey", async () => {
+    const fetchMock = vi.fn(
+      async (_req: Request) => new Response(JSON.stringify({ result: "approved" }), { status: 200 }),
+    );
+    const resolveOrchestrator = vi.fn(async (threadKey: string) => {
+      expect(threadKey).toBe(THREAD);
+      return { fetch: fetchMock };
+    });
+    const request = await signedInteractRequest({
+      userId: "U1",
+      actionId: "approve",
+      threadKey: THREAD,
+      approvalId: "appr_1",
+    });
+    const response = await handleSlackInteract(request, routeEnv("U1"), { resolveOrchestrator });
+    expect(response?.status).toBe(200);
+    await vi.waitFor(() => expect(resolveOrchestrator).toHaveBeenCalledWith(THREAD));
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("orchestratorStub dispatch failure surfaces an ephemeral error, acks 200", async () => {
     const respond = vi.fn(async (_url: string, text: string): Promise<void> => {
       void text;

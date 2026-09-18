@@ -14,7 +14,7 @@ export default defineConfig({
 		starlight({
 			title: 'AI Intern',
 			description:
-				'Open-source, self-hosted coding agent. Slack and dashboard to GitHub PR with approval gates.',
+				'Open-source, self-hosted coding workspace for approval-gated tasks in Cloudflare Sandbox.',
 			logo: {
 				src: './src/assets/logo.png',
 				alt: 'AI Intern Logo',
@@ -26,28 +26,33 @@ export default defineConfig({
 				{ icon: 'x.com', label: 'Twitter / X', href: 'https://x.com/prince_twets' },
 			],
 			editLink: {
-				baseUrl: 'https://github.com/princepal9120/ai-intern/edit/main/docs/',
+				baseUrl: 'https://github.com/princepal9120/ai-intern/edit/main/web/src/content/docs/',
 			},
 			sidebar: [
 				{
-					label: 'Get started',
+					label: 'Live App ↗',
+					link: 'https://shiba-intern.pages.dev/',
+					attrs: { target: '_blank', rel: 'noopener noreferrer' },
+				},
+				{
+					label: 'Start here',
 					items: [
 						{ label: 'Overview', slug: 'docs/overview' },
 						{ label: 'Quickstart', slug: 'docs/getting-started' },
-						{ label: 'Architecture', slug: 'docs/architecture' },
-						{ label: 'Models & pricing', slug: 'docs/costs' },
 					],
 				},
 				{
-					label: 'Core Concepts',
+					label: 'Understand',
 					items: [
+						{ label: 'Architecture', slug: 'docs/architecture' },
 						{ label: 'Approval Gates', slug: 'docs/approval-gates' },
 						{ label: 'Claude Code & OpenCode', slug: 'docs/claude-code' },
-						{ label: 'Cloudflare Sandbox', slug: 'docs/security' },
+						{ label: 'Security & credential boundaries', slug: 'docs/security' },
+						{ label: 'Models & costs', slug: 'docs/costs' },
 					],
 				},
 				{
-					label: 'Integrations',
+					label: 'Connect',
 					items: [
 						{ label: 'Slack Integration', slug: 'docs/slack' },
 						{ label: 'GitHub Pull Requests', slug: 'docs/github' },
@@ -55,7 +60,7 @@ export default defineConfig({
 					],
 				},
 				{
-					label: 'Operations & Dashboard',
+					label: 'Operate',
 					items: [
 						{ label: 'Tasks & Runs Dashboard', slug: 'docs/dashboard' },
 						{ label: 'Configuration & Secrets', slug: 'docs/configuration' },

@@ -1,12 +1,34 @@
-# AI Intern
+# Shiba
 
-An account-owned Cloudflare coding workspace: describe a GitHub task, review the proposed delegation, approve or reject it, and inspect a sandbox-generated diff. The runtime is Cloudflare Agents + Sandbox containers running OpenCode, with a React dashboard and Astro/Starlight documentation served by one Worker.
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-shiba--intern.pages.dev-0B9F95?style=flat-square&logo=cloudflarepages&logoColor=white)](https://shiba-intern.pages.dev/)
+[![Documentation](https://img.shields.io/badge/Docs-shiba--intern.pages.dev%2Fdocs-teal?style=flat-square)](https://shiba-intern.pages.dev/docs/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 
-**Status: local prototype, not production-ready.** No live end-to-end cloud run is claimed. `VERIFICATION.md` records the current evidence: `pnpm typecheck`, `pnpm lint`, `pnpm test` (285/288, 3 require a build), and `pnpm build` pass locally; `npx wrangler deploy --dry-run` fails on this machine because no Docker CLI is available to package the container image. Until a dated live run is recorded in `VERIFICATION.md` against the P2 acceptance bar in `PLAN.md` §15 (submit → approve → clone/code/collect with a diff that matches reality, rejection starting no container, honest failure exit codes, PR with deletions shown as deleted, peak memory measured), the honest status stays "local prototype".
+Shiba is an account-owned Cloudflare coding workspace: describe a GitHub task, review the proposed delegation, approve or reject it, and inspect a sandbox-generated diff. The repository includes a React dashboard and Astro/Starlight documentation, plus a Cloudflare Worker backend built around Agents and Sandbox containers running OpenCode.
+
+**Live Site & Deployment:** [https://shiba-intern.pages.dev/](https://shiba-intern.pages.dev/)
+- **Landing Page:** [https://shiba-intern.pages.dev/](https://shiba-intern.pages.dev/)
+- **Documentation:** [https://shiba-intern.pages.dev/docs/](https://shiba-intern.pages.dev/docs/)
+- **Tasks Dashboard:** [https://shiba-intern.pages.dev/app/](https://shiba-intern.pages.dev/app/)
+
+**Status: local prototype, not production-ready.** No live end-to-end cloud run is claimed. The deployed Cloudflare Pages site contains the static landing page at `/`, dashboard UI at `/app/`, and documentation at `/docs/`. This Pages deployment does not include the Worker backend, so it does not establish a live coding run. `VERIFICATION.md` records passing local typecheck, lint, tests, and build checks, while no live end-to-end cloud run has been performed. The backend remains a prototype until a dated run meets the P2 acceptance bar in `PLAN.md` §15: submit → approve → clone/code/collect with a diff that matches reality, rejection starting no container, honest failure exit codes, PRs with deletions shown as deleted, and peak memory measured.
 
 Provider traffic is intercepted at the Sandbox egress boundary and forwarded through the account owner's AI Gateway binding — there is no provider callback route (the dead callback path was deleted; the forwarder and its route no longer exist).
 
-## Deploy
+## Deploy the UI
+
+The existing `shiba-intern` Cloudflare Pages project hosts the static UI. Build the dashboard and docs, then deploy the assembled `public/` directory:
+
+~~~sh
+pnpm build
+pnpm exec wrangler pages deploy public --project-name shiba-intern --branch main --commit-dirty=true
+~~~
+
+This flow deploys only the landing page, `/app/` dashboard, and `/docs/` documentation. The UI is currently static and has no Worker API or WebSocket proxy.
+
+## Deploy the Worker backend
+
+The full self-hosted flow provisions the Cloudflare Worker, Durable Objects, Containers, R2, and AI Gateway integration. It is separate from the Pages UI deployment:
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/princepal9120/ai-intern)
 
@@ -20,7 +42,7 @@ Provider traffic is intercepted at the Sandbox egress boundary and forwarded thr
 
 **Resolve the readiness blockers before deploying.** Confirm Workers/Containers plan eligibility, quotas, and account billing in current Cloudflare documentation. Configure an account-owned AI Gateway with a stored Google BYOK key or Unified Billing, and select an available model id (model ids retire — see Configuration).
 
-After implementing and validating the missing security boundaries, operator commands are:
+After implementing and validating the missing security boundaries, the self-hosted Worker commands are:
 
 ~~~sh
 npx wrangler login
@@ -31,7 +53,7 @@ pnpm build
 pnpm deploy
 ~~~
 
-These commands change the operator's account. They were not executed as part of this documentation work. pnpm deploy invokes Wrangler; it does not automatically build the static assets first.
+These commands change the operator's account. They are separate from the Pages-only command above. `pnpm deploy` invokes Wrangler for the Worker and does not automatically build the static assets first.
 
 Protect every reachable hostname with Cloudflare Access or equivalent authentication. An obscure URL is not access control. Browser approval is not route authorization. Review the security docs before live operation.
 
@@ -51,16 +73,16 @@ pnpm build
 pnpm docs:preview
 ~~~
 
-Open **http://localhost:4321/docs/** to read the built documentation with search.
+Open **http://localhost:5173/** for the landing page, **http://localhost:5173/app/** for the dashboard UI, or **http://localhost:4321/docs/** to read the documentation with search.
 
-- Dashboard only: pnpm dev (port 5173; no Worker API proxy).
+- Dashboard and landing page: `pnpm dev` (port 5173; no Worker API proxy).
 - Docs editing: pnpm docs:dev (port 4321/docs/; search requires a production build).
 - Built Worker/assets: pnpm build, then npx wrangler dev. Containers require a compatible local engine; startup may fail without it.
-- Local deployment packaging: npx wrangler deploy --dry-run. This is not a deployment or proof of a live coding run.
+- Local Worker deployment packaging: npx wrangler deploy --dry-run. This is not a deployment or proof of a live coding run.
 
 ## Documentation
 
-The documentation site at /docs/ includes setup, configuration, local development, dashboard usage, deployment, GitHub integration, security, architecture, API reference, troubleshooting, cost surfaces, contributing, and an end-to-end acceptance checklist.
+The documentation site at `/docs/` includes setup, configuration, local development, dashboard usage, deployment, GitHub integration, security, architecture, API reference, troubleshooting, cost surfaces, contributing, and an end-to-end acceptance checklist.
 
 Source entry: [docs index](web/src/content/docs/index.md). Content lives in web/src/content/docs/docs/. The root build runs Vite first, builds Astro into web/dist, then copies web/dist into public/ and verifies local links, anchors, assets, and Pagefind output.
 
@@ -117,7 +139,7 @@ Bumping any of them requires re-running the P2 live acceptance run before claimi
 
 ## Slack
 
-Shipped: the `/ai-intern <github-repo-url> <task>` slash command (`POST /api/slack/command`), verified with HMAC-SHA256 and a 5-minute replay window. It queues a durable pending approval and replies with an in-thread Block Kit approval card whose Approve/Reject buttons dispatch to the orchestrator, gated by the `SLACK_APPROVERS` allowlist (unset = nobody can approve from Slack). The Events API endpoint (`POST /api/slack/events`) acks and dedupes on `event_id`; **mention-triggered dispatch is not shipped** — a mention acks but starts no run. The slash command, not mentions, is the Slack entry point.
+Shipped: `/ai-intern <github-repo-url> <task>` (`POST /api/slack/command`) and `@mention` (`POST /api/slack/events`). Both HMAC-verify, queue a durable pending approval, and post a Block Kit card. Mentions need `SLACK_BOT_TOKEN`; empty token means no card and no run. Repo comes from a GitHub URL in the mention/thread, else `SLACK_CHANNEL_REPOS`, else an in-thread ask. Clicks resolve on the DO named by the card pointer (`default` for slash, `slack:{team}:{channel}:{thread_ts}` for mentions), gated by `SLACK_APPROVERS` (unset = nobody).
 
 **`SLACK_APPROVERS` unset means nobody can approve from Slack.** That is deliberate: a valid signature authenticates Slack, not the human who clicked, and a Block Kit button in a public channel is clickable by every member.
 
@@ -125,7 +147,7 @@ No P3 live workspace verification is claimed. The P3 acceptance bar in `PLAN.md`
 
 ## Automations
 
-Implemented: the trigger-rule engine (schedule with a five-field cron and 5-minute floor, missed ticks coalesced; GitHub, Slack, incoming-webhook, and manual triggers, OR'd together at most one run per event). **Not shipped: the runner** — no `scheduled()` handler, no cron trigger, and no Automations Durable Object exist yet, so nothing fires unattended. A `runWhen` sentence on any trigger is checked by the cheap Workers AI model before the run starts and **fails closed** — a model error or an unparseable answer means no run, with the reason recorded.
+Implemented: the trigger-rule engine (schedule with a five-field cron and 5-minute floor, missed ticks coalesced; GitHub, Slack, incoming-webhook, and manual triggers, OR'd together at most one run per event) plus the production fire path. Cloudflare Triggers run `*/5 * * * *`; Worker `scheduled()` ticks due schedules through the `Automations` Durable Object. Verified GitHub webhooks and `POST /api/automations/{id}/trigger` fan out the same way. A `runWhen` sentence is checked by TypeSafe Noul when `TYPESAFE_API_KEY` is set (noul ≥ 0.8 to run), else Workers AI YES/NO, and **fails closed**. Runs still queue an approval unless unattended is granted.
 
 Safety, all three required together: approval by default, opt-in unattended mode refused unless opening a PR is the only mutation *and* the repo is allowlisted, and a daily run budget per automation. Kill switches: `enabled` per automation, `AUTOMATIONS_ENABLED` globally. Not verified live.
 
@@ -179,4 +201,3 @@ Cost surfaces include Workers, Workers AI planning inference, Durable Objects, C
 ## License
 
 MIT. See LICENSE.
-

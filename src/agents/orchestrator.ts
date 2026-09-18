@@ -86,6 +86,21 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
     this.setState({ ...this.state, pendingApprovals: next });
   }
 
+  override async onStart(): Promise<void> {
+    await super.onStart();
+    const interrupted = this.approvals
+      .filter((approval) => approval.status === "approved")
+      .map((approval) => this.store.get(`agent-tool:${approval.approvalId}`))
+      .filter((run): run is DelegatedRun => run !== null && isActiveStatus(run.status));
+    // Do not retry potentially published work after losing the execution context.
+    for (const run of interrupted) {
+      this.store.transition(run.runId, "error", {
+        error: "Execution interrupted by orchestrator restart. Inspect repository state before retrying.",
+      });
+    }
+    await Promise.all(interrupted.map((run) => this.destroySandbox(run.sandboxId)));
+  }
+
   override getModel(): string {
     return this.env.ORCHESTRATOR_MODEL || DEFAULT_ORCHESTRATOR_MODEL;
   }
@@ -133,9 +148,20 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
     toolCallId: string | undefined,
     abortSignal?: AbortSignal,
   ): Promise<string> {
+    abortSignal?.throwIfAborted();
     await this.reclaimRuns();
+    abortSignal?.throwIfAborted();
     const runs = this.store.list();
-    if (!canStartRun(runs)) {
+    const callId = toolCallId ?? crypto.randomUUID();
+    const runId = `agent-tool:${callId}`;
+    const reserved = this.store.get(runId);
+    if (!reserved && this.approvals.some((approval) => approval.approvalId === callId && approval.status === "approved")) {
+      return "Run was removed before execution.";
+    }
+    if (reserved && reserved.status !== "pending") {
+      return reserved.summary ?? reserved.error ?? `Run is ${reserved.status}.`;
+    }
+    if (!reserved && !canStartRun(runs)) {
       throw new Error(
         `Already running ${MAX_CONCURRENT_RUNS} coding tasks. Wait for one to finish before starting another.`,
       );
@@ -147,8 +173,6 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
           "Set the GITHUB_TOKEN secret or retry without requesting a pull request.",
       );
     }
-    const callId = toolCallId ?? crypto.randomUUID();
-    const runId = `agent-tool:${callId}`;
     const sandboxId = makeSandboxId(input.repoUrl, input.task, callId);
     const fullInput: CodingTaskInput = {
       repoUrl: input.repoUrl,
@@ -158,7 +182,7 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
       sandboxId,
       codingModel: this.env.CODING_MODEL || DEFAULT_CODING_MODEL,
     };
-    this.store.add(
+    if (!reserved) this.store.add(
       createRun({
         runId,
         sandboxId,
@@ -173,10 +197,11 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
     };
     this.store.transition(runId, "running");
     const controller = new AbortController();
-    controller.signal.addEventListener("abort", () => this.runControllers.delete(runId), { once: true });
     this.runControllers.set(runId, controller);
+    const signal = abortSignal ? AbortSignal.any([abortSignal, controller.signal]) : controller.signal;
     try {
-      const output = await childExecute(formatAgentToolInput(fullInput), { toolCallId: callId, abortSignal: abortSignal ?? controller.signal });
+      signal.throwIfAborted();
+      const output = await childExecute(formatAgentToolInput(fullInput), { toolCallId: callId, abortSignal: signal });
       if (typeof output === "string") {
         // The child reports status in a structured envelope. Trusting the transport
         // type instead would mark failed runs "completed".
@@ -199,6 +224,7 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
       finish("error", { error: redactSecrets(message).slice(0, 4000) });
       throw error;
     } finally {
+      this.runControllers.delete(runId);
       await this.destroySandbox(sandboxId);
     }
   }
@@ -208,7 +234,7 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
    * input is frozen at queue time and nothing executes until a human
    * resolves the pointer via POST /api/approvals.
    */
-  private queueSlackRun(input: { repoUrl?: unknown; task?: unknown; baseBranch?: unknown; publishPullRequest?: unknown }): Response {
+  private queueSlackRun(input: { repoUrl?: unknown; task?: unknown; baseBranch?: unknown; publishPullRequest?: unknown; threadKey?: unknown }): Response {
     const repoUrl = typeof input.repoUrl === "string" ? input.repoUrl : "";
     const task = typeof input.task === "string" ? input.task : "";
     try {
@@ -224,9 +250,10 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
       return Response.json({ error: "publishPullRequest was requested but GITHUB_TOKEN is not configured." }, { status: 400 });
     }
     const approvalId = crypto.randomUUID();
+    const threadKey = typeof input.threadKey === "string" && input.threadKey.trim() ? input.threadKey.trim() : "default";
     try {
       this.writeApprovals(createPendingApproval(this.approvals, {
-        threadKey: "default",
+        threadKey,
         approvalId,
         repoUrl,
         task: task.slice(0, 4000),
@@ -253,10 +280,10 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
       return Response.json({ error: "Invalid approval payload." }, { status: 400 });
     }
     const decidedBy = typeof rawDecidedBy === "string" && rawDecidedBy.trim() ? rawDecidedBy.slice(0, 200) : "unknown";
-    // Preflight before consuming the pointer: a failed start must leave the
-    // approval retryable, not burned as "approved" with nothing to show.
-    if (approved) {
-      await this.reclaimRuns();
+    if (approved) await this.reclaimRuns();
+    const result = resolvePendingApproval(this.approvals, { threadKey, approvalId, approved, decidedBy }, Date.now());
+    // Failed admission leaves the persisted approval pending and retryable.
+    if (result.result === "approved") {
       if (!canStartRun(this.store.list())) {
         return Response.json({ error: "All coding runs are busy. Approve again when a slot frees." }, { status: 409 });
       }
@@ -272,26 +299,43 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
         }
       }
     }
-    const result = resolvePendingApproval(this.approvals, { threadKey, approvalId, approved, decidedBy }, Date.now());
-    this.writeApprovals(pruneExpiredApprovals(result.approvals, Date.now()));
-    if (result.result === "approved") {
-      const record = result.approvals.find((a) => a.approvalId === approvalId);
-      if (record) {
-        const delegate = this.getTools()["delegate_coding_task"] as {
-          execute: (input: unknown, options?: unknown) => Promise<unknown>;
-        };
-        const execution = Promise.resolve(delegate.execute(
-          {
-            repoUrl: record.repoUrl,
-            task: record.task,
-            baseBranch: record.baseBranch ?? "main",
-            publishPullRequest: record.publishPullRequest ?? false,
-          },
-          { toolCallId: approvalId },
-        ));
-        // The HTTP ack must not wait on a container run.
-        void execution.catch(() => {});
-      }
+    const approvals = pruneExpiredApprovals(result.approvals, Date.now());
+    const record = result.result === "approved"
+      ? approvals.find((approval) => approval.approvalId === approvalId)
+      : undefined;
+    const run = record ? createRun({
+      runId: `agent-tool:${approvalId}`,
+      sandboxId: makeSandboxId(record.repoUrl, record.task, approvalId),
+      repoUrl: record.repoUrl,
+      task: record.task,
+      baseBranch: record.baseBranch ?? "main",
+      publishPullRequest: record.publishPullRequest ?? false,
+    }) : undefined;
+    // One state write reserves capacity and records the decision before any await.
+    this.setState({
+      ...this.state,
+      pendingApprovals: approvals,
+      runs: run ? [...this.store.list(), run] : this.store.list(),
+    });
+    if (run) {
+      const dispatch = async () => {
+        try {
+          const delegate = this.getTools()["delegate_coding_task"] as {
+            execute: (input: unknown, options?: unknown) => Promise<unknown>;
+          };
+          await delegate.execute({
+            repoUrl: run.repoUrl,
+            task: run.task,
+            baseBranch: run.baseBranch,
+            publishPullRequest: run.publishPullRequest,
+          }, { toolCallId: approvalId });
+        } catch (error) {
+          this.store.transition(run.runId, "error", {
+            error: redactSecrets(error instanceof Error ? error.message : String(error)).slice(0, 4000),
+          });
+        }
+      };
+      void dispatch();
     }
     return Response.json({ result: result.result satisfies ResolveResult });
   }

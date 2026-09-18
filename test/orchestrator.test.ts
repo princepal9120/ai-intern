@@ -6,6 +6,7 @@ import { parseAgentToolInput } from "../src/opencode-input.js";
 
 const mocks = vi.hoisted(() => ({ destroy: vi.fn(), execute: vi.fn() }));
 vi.mock("@cloudflare/think", () => ({ Think: class {
+  onStart() {}
   getTools() { return {}; }
   onRequest() { return new Response(null, { status: 404 }); }
 } }));
@@ -183,6 +184,19 @@ describe("orchestrator run routes", () => {
     expect(mocks.execute).not.toHaveBeenCalled();
     expect(instance.state.runs).toEqual([]); // no container, no run record yet
     expect(instance.state.pendingApprovals).toHaveLength(1);
+    expect(instance.state.pendingApprovals?.[0]?.threadKey).toBe("default");
+  });
+
+  it("stores the provided threadKey on a queued mention approval", async () => {
+    const instance = agent();
+    const threadKey = "slack:T:C:1758217392.000100";
+    const response = await instance.onRequest(new Request("https://internal/api/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repoUrl: "https://github.com/o/r", task: "fix it", threadKey, source: "slack" }),
+    }));
+    expect(response.status).toBe(200);
+    expect(instance.state.pendingApprovals?.[0]?.threadKey).toBe(threadKey);
   });
 
   it("resolves an approval exactly once; approve runs the frozen input, reject runs nothing", async () => {
@@ -226,5 +240,86 @@ describe("orchestrator run routes", () => {
     expect(mocks.execute).toHaveBeenCalledOnce();
     const calls = mocks.execute.mock.calls as unknown as [[string, { toolCallId: string }]];
     expect(parseAgentToolInput([{ role: "user", text: calls[0]![0]! }])).toMatchObject({ task: "second", baseBranch: "develop", publishPullRequest: true });
+  });
+});
+
+describe("approval handoff recovery", () => {
+  it("persists decision and run together before dispatch, then fails interrupted work on restart", async () => {
+    const instance = agent();
+    const queued = await instance.onRequest(new Request("https://internal/api/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repoUrl: "https://github.com/o/r", task: "fix" }),
+    }));
+    const { approvalId } = await queued.json() as { approvalId: string };
+    let crashState: OrchestratorState | undefined;
+    const writes: OrchestratorState[] = [];
+    instance.setState = (state) => {
+      writes.push(structuredClone(state));
+      Object.assign(instance, { state });
+    };
+    // Snapshot exactly at dispatch entry, before any child execution can start.
+    instance.getTools = () => {
+      crashState = structuredClone(instance.state);
+      throw new Error("Simulated process interruption before dispatch");
+    };
+    const request = () => new Request("https://internal/api/approvals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threadKey: "default", approvalId, approved: true, decidedBy: "U1" }),
+    });
+    expect((await instance.onRequest(request())).status).toBe(200);
+    expect(writes[0]?.pendingApprovals?.[0]?.status).toBe("approved");
+    expect(writes[0]?.runs[0]?.status).toBe("pending");
+    expect(crashState?.runs).toHaveLength(1);
+    expect(crashState?.runs[0]?.status).toBe("pending");
+    expect(mocks.execute).not.toHaveBeenCalled();
+
+    const restarted = agent();
+    restarted.setState(JSON.parse(JSON.stringify(crashState)) as OrchestratorState);
+    await restarted.onStart();
+    expect(restarted.state.runs[0]?.status).toBe("error");
+    expect(restarted.state.runs[0]?.error).toContain("orchestrator restart");
+    expect(restarted.state.pendingApprovals?.[0]?.status).toBe("approved");
+    expect(mocks.destroy).toHaveBeenCalledOnce();
+    expect(await (await restarted.onRequest(request())).json()).toEqual({ result: "unknown" });
+    expect(restarted.state.runs).toHaveLength(1);
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+});
+
+describe("combined cancellation signals", () => {
+  it.each(["caller", "run"])("aborts child from %s cancellation and releases controller", async (source) => {
+    const instance = agent();
+    const caller = new AbortController();
+    mocks.execute.mockImplementation(async (_input, options: { abortSignal: AbortSignal }) => {
+      await new Promise((_resolve, reject) => {
+        options.abortSignal.addEventListener("abort", () => reject(new Error("cancelled")), { once: true });
+      });
+    });
+    const delegate = instance.getTools()["delegate_coding_task"] as {
+      execute: (input: unknown, options: unknown) => Promise<unknown>;
+    };
+    const execution = delegate.execute({ repoUrl: "https://github.com/o/r", task: "fix", baseBranch: "main", publishPullRequest: false },
+      { toolCallId: "combined", abortSignal: caller.signal });
+    const outcome = expect(execution).rejects.toThrow("cancelled");
+    await vi.waitFor(() => expect(mocks.execute).toHaveBeenCalledOnce());
+    if (source === "caller") caller.abort();
+    else await instance.cancelRun("agent-tool:combined");
+    await outcome;
+    expect((instance as unknown as { runControllersMap: Map<string, AbortController> }).runControllersMap.size).toBe(0);
+  });
+
+  it("does not dispatch or retain a run for an already-aborted caller", async () => {
+    const instance = agent();
+    const caller = new AbortController();
+    caller.abort(new Error("already cancelled"));
+    const delegate = instance.getTools()["delegate_coding_task"] as {
+      execute: (input: unknown, options: unknown) => Promise<unknown>;
+    };
+    await expect(delegate.execute({ repoUrl: "https://github.com/o/r", task: "fix", baseBranch: "main", publishPullRequest: false },
+      { toolCallId: "pre-abort", abortSignal: caller.signal })).rejects.toThrow("already cancelled");
+    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(instance.state.runs).toEqual([]);
   });
 });

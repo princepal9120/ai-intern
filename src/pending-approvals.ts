@@ -73,12 +73,12 @@ export function resolvePendingApproval(
     return { result: "unknown", approvals };
   }
   const record = approvals[index]!;
+  if (record.status !== "pending") {
+    return { result: "unknown", approvals };
+  }
   if (now - record.createdAt > APPROVAL_TTL_MS) {
     // Expired pointers resolve nothing and are pruned, like stale cards.
     return { result: "unknown", approvals: approvals.filter((a) => a.approvalId !== input.approvalId) };
-  }
-  if (record.status !== "pending") {
-    return { result: "unknown", approvals };
   }
   const next = approvals.map((a, i) =>
     i === index

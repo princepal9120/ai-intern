@@ -72,7 +72,7 @@ export interface SlackEventsDeps {
 export interface SlackEventCallbackBody {
   type: "event_callback";
   event_id: string;
-  event?: { type?: string };
+  event?: Record<string, unknown> & { type?: string };
   [key: string]: unknown;
 }
 

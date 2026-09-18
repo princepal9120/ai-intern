@@ -10,16 +10,16 @@ CodingOrchestrator (Think + Durable Object, name default)
   | delegate_coding_task, needsApproval: true
 OpenCodeAgent (AIChatAgent + structured task envelope)
   | Sandbox runtime adapter
-Sandbox Durable Object + container (one ID per run, max 3)
+Sandbox Durable Object + container (one ID per run, max 5)
   | OpenCode with dummy Google key
-Worker /api/provider/google -> account AI Gateway -> Google model
+Sandbox egress -> account AI Gateway -> Google model
 
 Worker /api/runs -> retained registry
 Worker GitHub REST calls -> optional branch and PR
 Worker /api/github/webhook -> verified acknowledgment only
 ~~~
 
-The parent uses Workers AI for planning. Real model-provider and GitHub credentials are not supplied to the container by this implementation. The callback's authentication remains incomplete; the diagram is not a validated production security boundary.
+The parent uses Workers AI for planning. Real model-provider and GitHub credentials are not supplied to the container by this implementation. Provider traffic is intercepted at Sandbox egress; there is no public `/api/provider/google` route. The callback's authentication remains incomplete; the diagram is not a validated production security boundary.
 
 ## Source map
 
@@ -48,4 +48,3 @@ The computer adapter is a guarded refusal, not an implemented runtime. The inten
 celld is not a deployment target: Workers-compatible execution alone does not provide the managed Sandbox/Containers bindings this repository uses.
 
 Official sources: [Agents](https://developers.cloudflare.com/agents/), [Sandbox](https://developers.cloudflare.com/sandbox/), [Containers](https://developers.cloudflare.com/containers/), [AI Gateway](https://developers.cloudflare.com/ai-gateway/).
-

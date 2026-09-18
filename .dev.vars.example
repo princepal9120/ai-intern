@@ -11,6 +11,10 @@
 # SLACK_SIGNING_SECRET=
 # SLACK_APPROVERS=
 # SLACK_BOT_TOKEN=
+# JSON map {channelId: "https://github.com/owner/repo"} for bare @mentions.
+# SLACK_CHANNEL_REPOS=
+# Optional TypeSafe System One key for run_when (falls back to Workers AI).
+# TYPESAFE_API_KEY=
 
 # AI Gateway uses the AI binding and GATEWAY_ID, not a container provider key.
 # Optional: sent as cf-aig-authorization on gateway requests (src/egress.ts).

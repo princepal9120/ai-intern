@@ -64,5 +64,6 @@
       "node-liblzma",
       "workerd"
     ]
-  }
+  },
+  "homepage": "https://shiba-intern.pages.dev/"
 }
