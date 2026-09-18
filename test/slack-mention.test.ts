@@ -252,3 +252,60 @@ describe("intentHint", () => {
   });
 });
 
+
+describe("classifySlackMentionIntent wired into handleSlackEvent", () => {
+  it("prepends intent hint to task when TYPESAFE_API_KEY is set and classification succeeds", async () => {
+    const queueRun = vi.fn<QueueRun>(async () => ({ approvalId: "appr_intent" }));
+    const postMessage = vi.fn<PostMessage>(async () => {});
+    const typeSafeFetch: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({
+          answers: {
+            intent: {
+              type: "choice",
+              choice: "fix",
+              probabilities: { fix: 0.92, implement: 0.04, explain: 0.02, other: 0.02 },
+            },
+          },
+        }),
+        { status: 200 },
+      );
+    await handleSlackEvent(
+      mention({ text: `<@U0> the login is broken ${REPO}` }),
+      env({ TYPESAFE_API_KEY: "ts-key" }),
+      { queueRun, postMessage, fetchThread: async () => [], typeSafeFetch },
+    );
+    expect(queueRun).toHaveBeenCalledOnce();
+    const queued = queueRun.mock.calls.at(0)?.at(0);
+    // task should start with the intent hint sentence
+    expect(queued?.task).toMatch(/fix a bug|broken behaviour/i);
+  });
+
+  it("sends task unchanged when TYPESAFE_API_KEY is absent", async () => {
+    const queueRun = vi.fn<QueueRun>(async () => ({ approvalId: "appr_nohint" }));
+    const postMessage = vi.fn<PostMessage>(async () => {});
+    await handleSlackEvent(
+      mention({ text: `<@U0> fix the login ${REPO}` }),
+      env({ TYPESAFE_API_KEY: undefined }),
+      { queueRun, postMessage, fetchThread: async () => [] },
+    );
+    expect(queueRun).toHaveBeenCalledOnce();
+    const queued = queueRun.mock.calls.at(0)?.at(0);
+    // no hint prepended
+    expect(queued?.task).not.toMatch(/The user wants you/);
+  });
+
+  it("sends task unchanged when classification fails (fail-open)", async () => {
+    const queueRun = vi.fn<QueueRun>(async () => ({ approvalId: "appr_fail" }));
+    const postMessage = vi.fn<PostMessage>(async () => {});
+    // env has key but fetch throws
+    await handleSlackEvent(
+      mention({ text: `<@U0> fix login ${REPO}` }),
+      env({ TYPESAFE_API_KEY: "ts-key" }),
+      { queueRun, postMessage, fetchThread: async () => [] },
+    );
+    // still queued despite classification failure
+    expect(queueRun).toHaveBeenCalledOnce();
+  });
+});
+

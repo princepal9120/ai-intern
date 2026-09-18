@@ -32,6 +32,7 @@ import {
   type ResolveResult,
 } from "../pending-approvals.js";
 import { makeSandboxId, parseGitHubRepoUrl, redactSecrets } from "../security.js";
+import { evaluateResultQuality } from "../result-quality.js";
 import { OpenCodeAgent } from "./opencode-agent.js";
 
 export interface OrchestratorState {
@@ -208,6 +209,18 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
         const parsed = parseAgentResult(output);
         if (parsed?.status === "completed") {
           finish("completed", { summary: output.slice(0, 4000), diff: parsed?.diff ? parsed.diff.slice(0, 20000) : undefined });
+          // TypeSafe Score: grade the run quality (fail-open — never blocks completion).
+          // Emits a "grade" receipt into the run store if TYPESAFE_API_KEY is set.
+          const tsKey = this.env.TYPESAFE_API_KEY?.trim() ?? "";
+          if (tsKey) {
+            evaluateResultQuality(tsKey, output.slice(0, 2000)).then((quality) => {
+              if (quality) {
+                this.store.transition(runId, "completed", {
+                  summary: `[quality:${quality.level}] ${output.slice(0, 4000)}`,
+                });
+              }
+            }).catch(() => { /* fail-open */ });
+          }
           return output;
         }
         finish("error", {

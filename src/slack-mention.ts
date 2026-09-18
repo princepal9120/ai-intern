@@ -41,6 +41,8 @@ export interface SlackMentionDeps {
     blocks?: unknown[];
   }) => Promise<void>;
   fetchThread?: (channel: string, threadTs: string) => Promise<SlackThreadMessage[]>;
+  /** Injected in tests to mock the TypeSafe API call for intent classification. */
+  typeSafeFetch?: MentionFetchImpl;
 }
 
 interface AppMentionEvent {
@@ -278,10 +280,29 @@ export async function handleSlackEvent(
     return;
   }
 
+  // TypeSafe Choice: classify intent to sharpen the orchestrator system prompt.
+  // Fail-open — null means no classification, no change to the run path.
+  const intentApiKey = env.TYPESAFE_API_KEY?.trim() ?? "";
+  const intentClassification = intentApiKey
+    ? await classifySlackMentionIntent(
+        intentApiKey,
+        stripMentionMarkers(mentionText),
+        task,
+        deps.typeSafeFetch,
+      ).catch(() => null)
+    : null;
+  const hint = intentHint(intentClassification);
+
   const threadKey = buildSlackThreadName(teamId, channelId, threadTs);
+  // Prepend the TypeSafe intent hint to the task when available.
+  // The hint is a single sentence that sharpens the orchestrator system prompt;
+  // it does not change the approval card — the human still sees exact arguments.
+  const taskWithHint = hint ? `${hint}
+${task}` : task;
+
   const payload = buildSlackRunPayload({
     repoUrl: resolution.repoUrl,
-    task,
+    task: taskWithHint,
     channelId,
     userId,
   });
@@ -310,7 +331,7 @@ export async function handleSlackEvent(
     const { approvalId } = await queueRun({
       threadKey,
       repoUrl: resolution.repoUrl,
-      task,
+      task: taskWithHint,
       channelId,
       userId,
     });
