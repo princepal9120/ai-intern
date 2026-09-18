@@ -1,6 +1,6 @@
 # Verification Results
 
-**Last run: 2026-09-18.**
+**Last run: 2026-09-18 (rev 5).**
 
 ## Status: PASS with one documented environment limitation
 
@@ -8,8 +8,8 @@
 |-------|--------|
 | `pnpm typecheck` | PASS |
 | `pnpm lint` | PASS |
-| `pnpm test` | PASS (371/371 across 30 files) |
-| `pnpm build` | PASS (docs: 22 pages, 913 links verified) |
+| `pnpm test` | PASS (374/374 across 30 files) |
+| `pnpm build` | PASS (docs: 22 pages, 904 links verified) |
 | `pnpm docs:check` | PASS |
 | `npx wrangler deploy --dry-run` | **NOT RUN this pass: Docker CLI exists (`/opt/homebrew/bin/docker`) but no daemon is reachable (OrbStack socket absent).** |
 | Live cloud run (PLAN.md T10) | **NOT ATTEMPTED** |
@@ -24,7 +24,7 @@ Specifically unmeasured: peak container memory (which decides `basic` vs `standa
 
 **The Claude Code and Codex harnesses are not runnable from the shipped image.** The Dockerfile installs `opencode-ai` only. Their config, argv, env, and event parsers are unit-tested; neither has been run against a live CLI, so their stream formats are asserted from documentation, not observation. Setting `AGENT_HARNESS=claude-code` or `codex` today fails at exec.
 
-## What the 371 tests do cover
+## What the 374 tests do cover
 
 - **Egress credential boundary.** `github.com` defaults to refusal; the credential is attached only for the run's own `/owner/repo`, with prefix-confusion siblings (`/owner/repo-evil`) and non-GitHub destinations refused, and no `Authorization` header reaching a refused request. The scope is proven to be installed *before* the clone, not after.
 - **Automation safety.** Approval required by default; unattended mode refused for a non-allowlisted repo and for any run mutating more than a pull request; the daily budget refusing run N+1 with its reason and resetting on the next UTC day; both kill switches.
@@ -51,5 +51,7 @@ Specifically unmeasured: peak container memory (which decides `basic` vs `standa
 - Typecheck errors (5): dashboard import path, missing runtime test imports, unused label.
 - Test failures (7): `streamProgress` propagating `OpenCodeErrorEvent` instead of swallowing it; `runCodingTask` returning error details; `collectChanges` skipping deleted files; `redactSecrets` covering `AI_GATEWAY_TOKEN=`; progress cap counting only streamed events.
 - Lint errors (2): unused `signal` param, unused label.
+- **TypeSafe Choice intent wired** (handleSlackEvent). When TYPESAFE_API_KEY is set, classifySlackMentionIntent classifies Slack mention intent (fix/implement/explain/other) and prepends an intentHint sentence to the queued task. Fail-open — null leaves task unchanged. SlackMentionDeps.typeSafeFetch allows test injection. 374 tests include the wired path with mock fetch.
+- **TypeSafe Score result wired** (orchestrator.ts finish completed). When TYPESAFE_API_KEY is set, evaluateResultQuality scores run output quality and annotates the run summary with the grade level. Fire-and-forget — never delays run completion.
 - **TypeSafe Score result quality** (src/result-quality.ts). evaluateResultQuality returns null on missing key, HTTP errors, parse failures, and network errors; parses score + confidence + level correctly; sends the correct Score request shape.
 - **TypeSafe Choice intent classification** (src/slack-mention.ts classifySlackMentionIntent). Returns null on missing key, empty mention, HTTP/parse/network errors; classifies fix/implement/explain/other; maps unknown choices to other; sends correct Choice request shape. intentHint returns sharpened prompt text per intent.

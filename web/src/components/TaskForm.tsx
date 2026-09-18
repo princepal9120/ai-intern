@@ -1,4 +1,4 @@
-import { createElement, type FormEvent } from "react";
+import { createElement, type SyntheticEvent } from "react";
 
 export interface TaskFormProps {
   repoUrl?: string;
@@ -12,7 +12,7 @@ export interface TaskFormProps {
   onTaskChange?: (value: string) => void;
   onBaseBranchChange?: (value: string) => void;
   onPublishPullRequestChange?: (value: boolean) => void;
-  onSubmit?: (event: FormEvent) => void;
+  onSubmit?: (event: SyntheticEvent) => void;
   onClear?: () => void;
 }
 
@@ -43,7 +43,7 @@ export function TaskForm({
     {
       "data-testid": "task-submission-form",
       "aria-label": "Task submission form",
-      onSubmit: onSubmit ?? ((event: FormEvent) => event.preventDefault()),
+      onSubmit: onSubmit ?? ((event: SyntheticEvent) => event.preventDefault()),
       className: "flex flex-col gap-4",
     },
     createElement(

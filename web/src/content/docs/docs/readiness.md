@@ -5,7 +5,10 @@ description: Known gaps and evidence required before production use.
 
 ## Status
 
-The static documentation/dashboard build and mocked tests do not establish that a deployed coding task works end to end. This is a prototype. Do not expose it publicly or call it production-ready. spec/GOAL.md contains targets beyond the current implementation.
+**Local prototype — 374/374 tests passing, typecheck and lint clean, build verified.**
+The static documentation/dashboard build and mocked tests do not establish that a deployed coding task works end to end. Do not expose it publicly or call it production-ready without completing the live run (T10) and cloud acceptance criteria in PLAN.md §15.
+
+**Shipped in code (unverified live):** dashboard, approval gate, Sandbox egress allowlist, scoped GitHub credential, Cloudflare Access gating, result envelope, progress streaming, Slack mention + slash-command lanes, automations engine (cron/GitHub/webhook/Slack/manual triggers), run_when TypeSafe Noul gate, harness seam (OpenCode/Claude Code/Codex), TypeSafe Choice intent classification wired into Slack dispatch, TypeSafe Score result quality wired into run completion.
 
 ## Remaining blockers
 
@@ -46,5 +49,4 @@ After implementing the missing boundaries, use an isolated test installation and
 9. Check keyboard operation, narrow/desktop layouts, docs navigation/search, and missing-path 404 behavior.
 
 Record date, revisions, versions, environment, results, and unresolved failures. Mocked tests alone are insufficient to mark the product complete.
-
 
