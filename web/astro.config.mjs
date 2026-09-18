@@ -30,7 +30,7 @@ export default defineConfig({
 			},
 			sidebar: [
 				{
-					label: 'Live App ↗',
+					label: 'Landing Page ↗',
 					link: 'https://shiba-intern.pages.dev/',
 					attrs: { target: '_blank', rel: 'noopener noreferrer' },
 				},

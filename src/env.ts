@@ -32,8 +32,6 @@ export interface Env {
    * lite | basic | standard-1 | standard-2 | standard-3 | standard-4.
    */
   INSTANCE_TYPE?: string;
-  /** Optional R2 bucket for stop/resume/fork workspace snapshots. */
-  SNAPSHOTS?: R2Bucket;
   /** Optional. Verifies Slack callbacks; unset disables all Slack routes. */
   SLACK_SIGNING_SECRET?: string;
   /** Optional. Comma-separated Slack user ids allowed to approve; unset = nobody. */

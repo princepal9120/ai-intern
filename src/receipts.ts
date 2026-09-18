@@ -1,7 +1,7 @@
 /**
  * Cloudbox-style append-only evidence log. A run is the receipts, not a
  * final envelope: init → clone/configure/code/collect → submit|error, plus
- * stop/resume/fork. Bounded so DO state cannot grow without limit.
+ * advisory grades. Bounded so DO state cannot grow without limit.
  */
 import { boundTail, redactSecrets } from "./security.js";
 
@@ -16,9 +16,6 @@ export const RECEIPT_KINDS = [
   "collect",
   "submit",
   "grade",
-  "stop",
-  "resume",
-  "fork",
   "error",
 ] as const;
 

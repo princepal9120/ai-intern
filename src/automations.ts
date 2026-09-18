@@ -21,6 +21,7 @@
  * Worker, in Vitest, and anywhere else without modification.
  */
 import { InputError, parseGitHubRepoUrl } from "./security.js";
+import { postSystemOne, readNoulAnswer, type TypeSafeFetch } from "./typesafe.js";
 
 /** Minimum gap between two schedule firings, in minutes. */
 export const SCHEDULE_FLOOR_MINUTES = 5;
@@ -592,13 +593,15 @@ export interface RunWhenVerdict {
   reason: string;
 }
 
-export const TYPESAFE_SYSTEMONE_URL = "https://api.typesafe.ai/v1/systemone";
-/** Noul near 0.5 is a coin flip — require a clear yes. */
+/**
+ * Probability the `run_when` condition is true, per TypeSafe's Noul
+ * primitive ("noul" = the probability of yes). 0.5 is a coin flip, so a
+ * clear yes is required: below the threshold the event is skipped.
+ */
 export const TYPESAFE_NOUL_YES_THRESHOLD = 0.8;
 
-export interface TypeSafeNoulFetch {
-  (input: string | URL, init?: RequestInit): Promise<Response>;
-}
+/** Kept for callers/tests that stub the TypeSafe fetch through the gate. */
+export type TypeSafeNoulFetch = TypeSafeFetch;
 
 function readModelAnswer(raw: unknown): string | null {
   if (typeof raw === "string") return raw;
@@ -607,16 +610,6 @@ function readModelAnswer(raw: unknown): string | null {
     if (typeof response === "string") return response;
   }
   return null;
-}
-
-function readNoul(raw: unknown): number | null {
-  if (typeof raw !== "object" || raw === null) return null;
-  const answers = (raw as { answers?: unknown }).answers;
-  if (typeof answers !== "object" || answers === null) return null;
-  const match = (answers as { match?: unknown }).match;
-  if (typeof match !== "object" || match === null) return null;
-  const noul = (match as { noul?: unknown }).noul;
-  return typeof noul === "number" && Number.isFinite(noul) ? noul : null;
 }
 
 /**
@@ -628,40 +621,28 @@ export async function evaluateRunWhenTypeSafe(
   eventSummary: string,
   fetchImpl: TypeSafeNoulFetch = fetch,
 ): Promise<RunWhenVerdict> {
-  try {
-    const response = await fetchImpl(TYPESAFE_SYSTEMONE_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+  const answers = await postSystemOne(
+    apiKey,
+    { condition: runWhen, event: eventSummary },
+    {
+      match: {
+        type: "noul",
+        instructions: "Does `condition` clearly hold for `event`?",
       },
-      body: JSON.stringify({
-        state: { condition: runWhen, event: eventSummary },
-        model: "jev-latest",
-        questions: {
-          match: {
-            type: "noul",
-            instructions: "Does `condition` clearly hold for `event`?",
-          },
-        },
-      }),
-    });
-    if (!response.ok) {
-      return { run: false, reason: `run_when gate failed closed: TypeSafe HTTP ${response.status}` };
-    }
-    const body: unknown = await response.json();
-    const noul = readNoul(body);
-    if (noul === null) {
-      return { run: false, reason: "run_when gate failed closed: TypeSafe returned no noul." };
-    }
-    if (noul >= TYPESAFE_NOUL_YES_THRESHOLD) {
-      return { run: true, reason: `run_when matched: ${runWhen}` };
-    }
-    return { run: false, reason: `run_when did not match: ${runWhen}` };
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    return { run: false, reason: `run_when gate failed closed: ${detail}` };
+    },
+    fetchImpl,
+  );
+  if (answers === null) {
+    return { run: false, reason: "run_when gate failed closed: TypeSafe request failed." };
   }
+  const noul = readNoulAnswer(answers, "match");
+  if (noul === null) {
+    return { run: false, reason: "run_when gate failed closed: TypeSafe returned no noul." };
+  }
+  if (noul >= TYPESAFE_NOUL_YES_THRESHOLD) {
+    return { run: true, reason: `run_when matched: ${runWhen}` };
+  }
+  return { run: false, reason: `run_when did not match: ${runWhen}` };
 }
 
 /**

@@ -34,6 +34,13 @@ Specifically unmeasured: peak container memory (which decides `basic` vs `standa
 
 ## Fix history
 
+**2026-09-18 (code-review findings pass)**
+- One TypeSafe System One client (`src/typesafe.ts`): `postSystemOne` + typed `readNoulAnswer`/`readChoiceAnswer`/`readScoreAnswer` replace the three hand-rolled copies of the endpoint constant, Bearer envelope, and null-on-error handling in `automations.ts`, `result-quality.ts`, and `slack-mention.ts`. Policy stays in the callers — the run_when gate fails closed, intent classification and quality scoring fail open.
+- Dead TypeSafe grade fixed: the orchestrator previously annotated quality via a `completed` transition that `transitionRun` silently discards on terminal runs. The grade now lands as a `grade` receipt on the finished record (pinned by a new test in `test/runs.test.ts`).
+- Removed the stop/resume/fork snapshot feature: PLAN.md §0 cuts snapshots and §4 files resumable runs under future work ("a real architecture change"). Deleted `src/snapshots.ts`, the `SNAPSHOTS` R2 binding, the `stopped` status and `snapshotKey`/`parentRunId`/`skipClone` fields, and the `/api/runs/:id/{stop,resume,fork}` route acceptance that no handler implemented. The feature had zero test coverage.
+- Automation webhook secret is header-only (`x-automation-secret`); the `?secret=` query-param fallback was removed because query strings land in access logs.
+- Honesty fixes: README "Live Demo" badge and "Live Site & Deployment" section relabelled — the Pages site is static landing/docs/dashboard UI and the pipeline's status is local prototype until T10; docs sidebar "Live App ↗" → "Landing Page ↗"; PLAN.md §2.0 synced to rev 5 (374→375 tests, dry run green).
+
 **2026-09-18 (review-findings pass)**
 - Slack approval lane closed end to end: POST /api/runs queues a durable pending approval in the orchestrator DO (frozen delegation input, 30-min TTL, resolve-exactly-once, non-object bodies rejected at the route). Slash-command replies and `@mention` cards (`SLACK_BOT_TOKEN`) both carry Block Kit; `/api/slack/interact` resolves on the pointer `threadKey` DO (`default` for slash, `slack:{team}:{channel}:{thread_ts}` for mentions). Empty bot token: no mention card and no run. Repo: GitHub URL, else `SLACK_CHANNEL_REPOS`, else an in-thread ask.
 - Run lifecycle: 30-minute deadline reclaim (reclaim-on-access), cancellation propagation via per-run AbortController, terminal runs immutable, sandbox destroyed on cancel/reclaim/finish.

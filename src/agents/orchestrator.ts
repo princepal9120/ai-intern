@@ -21,9 +21,11 @@ import {
   createRun,
   isActiveStatus,
   reclaimStaleRuns,
+  recordReceipt,
   type DelegatedRun,
   type RunStatus,
 } from "../runs.js";
+import { makeReceipt } from "../receipts.js";
 import {
   createPendingApproval,
   pruneExpiredApprovals,
@@ -210,14 +212,19 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
         if (parsed?.status === "completed") {
           finish("completed", { summary: output.slice(0, 4000), diff: parsed?.diff ? parsed.diff.slice(0, 20000) : undefined });
           // TypeSafe Score: grade the run quality (fail-open — never blocks completion).
-          // Emits a "grade" receipt into the run store if TYPESAFE_API_KEY is set.
+          // Terminal runs are immutable (transitionRun refuses them), so the
+          // grade lands as a "grade" receipt on the finished record — never
+          // as a second transition, which would be silently discarded.
           const tsKey = this.env.TYPESAFE_API_KEY?.trim() ?? "";
           if (tsKey) {
             evaluateResultQuality(tsKey, output.slice(0, 2000)).then((quality) => {
-              if (quality) {
-                this.store.transition(runId, "completed", {
-                  summary: `[quality:${quality.level}] ${output.slice(0, 4000)}`,
-                });
+              if (!quality) return;
+              const run = this.store.get(runId);
+              if (run) {
+                this.store.replace(
+                  runId,
+                  recordReceipt(run, makeReceipt("grade", `Result quality: ${quality.level} (score ${quality.score.toFixed(2)}, confidence ${quality.confidence.toFixed(2)}).`)),
+                );
               }
             }).catch(() => { /* fail-open */ });
           }

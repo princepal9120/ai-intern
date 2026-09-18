@@ -19,9 +19,6 @@
     // Must match containers.instance_type. Cloudbox-style deploy-time size knob.
     "INSTANCE_TYPE": "standard-1",
   },
-  "r2_buckets": [
-    { "binding": "SNAPSHOTS", "bucket_name": "ai-intern-snapshots" },
-  ],
   "ai": {
     "binding": "AI",
   },

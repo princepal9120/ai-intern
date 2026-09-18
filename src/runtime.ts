@@ -91,19 +91,11 @@ export class SandboxRuntimeAdapter implements RuntimeAdapter {
     const config = this.harness.configFile(input, input.sandboxId);
 
     throwIfAborted(opts?.signal);
-    if (input.skipClone) {
-      await emit({
-        phase: "clone",
-        message: `Restored snapshot for ${input.repoUrl} (branch ${input.baseBranch}); skip clone.`,
-        fraction: 0.05,
-      });
-    } else {
-      await emit({ phase: "clone", message: `Cloning ${input.repoUrl} (branch ${input.baseBranch}).`, fraction: 0.05 });
-      try {
-        await ops.gitCheckout(input.repoUrl, { branch: input.baseBranch, targetDir: workdir });
-      } catch (error) {
-        return failureResult(`Clone failed: ${shortError(error)}`, 0, "");
-      }
+    await emit({ phase: "clone", message: `Cloning ${input.repoUrl} (branch ${input.baseBranch}).`, fraction: 0.05 });
+    try {
+      await ops.gitCheckout(input.repoUrl, { branch: input.baseBranch, targetDir: workdir });
+    } catch (error) {
+      return failureResult(`Clone failed: ${shortError(error)}`, 0, "");
     }
 
     await emit({ phase: "configure", message: "Writing isolated OpenCode config.", fraction: 0.15 });

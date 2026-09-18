@@ -1,12 +1,14 @@
 # Shiba
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-shiba--intern.pages.dev-0B9F95?style=flat-square&logo=cloudflarepages&logoColor=white)](https://shiba-intern.pages.dev/)
+[![Site](https://img.shields.io/badge/Site-shiba--intern.pages.dev-0B9F95?style=flat-square&logo=cloudflarepages&logoColor=white)](https://shiba-intern.pages.dev/)
 [![Documentation](https://img.shields.io/badge/Docs-shiba--intern.pages.dev%2Fdocs-teal?style=flat-square)](https://shiba-intern.pages.dev/docs/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 
 Shiba is an account-owned Cloudflare coding workspace: describe a GitHub task, review the proposed delegation, approve or reject it, and inspect a sandbox-generated diff. The repository includes a React dashboard and Astro/Starlight documentation, plus a Cloudflare Worker backend built around Agents and Sandbox containers running OpenCode.
 
-**Live Site & Deployment:** [https://shiba-intern.pages.dev/](https://shiba-intern.pages.dev/)
+**Status: local prototype.** No live end-to-end cloud run has been recorded yet (see `VERIFICATION.md`, PLAN.md T10). The Pages site below hosts only the static landing page, docs, and dashboard UI — it is not a verified live deployment of the coding pipeline.
+
+**Static site (landing, docs, dashboard UI):** [https://shiba-intern.pages.dev/](https://shiba-intern.pages.dev/)
 - **Landing Page:** [https://shiba-intern.pages.dev/](https://shiba-intern.pages.dev/)
 - **Documentation:** [https://shiba-intern.pages.dev/docs/](https://shiba-intern.pages.dev/docs/)
 - **Tasks Dashboard:** [https://shiba-intern.pages.dev/app/](https://shiba-intern.pages.dev/app/)

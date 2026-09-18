@@ -6,8 +6,10 @@ import {
   countActiveRuns,
   createRun,
   isActiveStatus,
+  recordReceipt,
   transitionRun,
 } from "../src/runs.js";
+import { makeReceipt } from "../src/receipts.js";
 
 function makeRun(runId: string, status: Parameters<typeof transitionRun>[1] = "pending") {
   return transitionRun(
@@ -173,6 +175,21 @@ describe("run registry", () => {
 describe("run deadline headroom", () => {
   it("exceeds the worst-case phase budget (clone 5m + harness 15m + git 5m)", () => {
     expect(RUN_DEADLINE_MS).toBeGreaterThanOrEqual(45 * 60 * 1000);
+  });
+});
+
+describe("grade receipts on terminal runs", () => {
+  it("a terminal transition is immutable, but a grade receipt still lands", () => {
+    const completed = transitionRun(makeRun("g1", "running"), "completed", { summary: "done" });
+    // The bug this pins: re-transitioning a terminal run is a silent no-op,
+    // so a quality grade must arrive as a receipt, not a transition.
+    const discarded = transitionRun(completed, "completed", { summary: "[quality] never lands" });
+    expect(discarded.summary).toBe("done");
+    const graded = recordReceipt(completed, makeReceipt("grade", "Result quality: full success."));
+    expect(graded.status).toBe("completed");
+    expect(graded.summary).toBe("done");
+    expect(graded.receipts?.at(-1)?.kind).toBe("grade");
+    expect(graded.receipts?.at(-1)?.message).toContain("full success");
   });
 });
 

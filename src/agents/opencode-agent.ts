@@ -28,11 +28,6 @@ import {
   type SandboxOps,
 } from "../runtime.js";
 import { boundTail, parseGitHubRepoUrl, redactSecrets } from "../security.js";
-import {
-  getSnapshot,
-  restoreWorkspace,
-  snapshotWorkdir,
-} from "../snapshots.js";
 import { messageText, renderRunTranscript } from "../transcript.js";
 
 export async function pinSandboxEgress(
@@ -174,14 +169,6 @@ export class OpenCodeAgent extends AIChatAgent<Env> {
           const adapter = createRuntimeAdapter(resolveRuntimeName(this.env.RUNTIME), harness);
           const hosts = allowedHostsFor(harness, input.codingModel);
           const ops = createSandboxOps(this.env, input.sandboxId, hosts);
-          if (input.skipClone) {
-            await pinSandboxEgress(this.env, input.sandboxId, input.repoUrl, hosts);
-            if (input.snapshotKey) {
-              if (!this.env.SNAPSHOTS) throw new Error("SNAPSHOTS R2 bucket is not bound.");
-              const body = await getSnapshot(this.env.SNAPSHOTS, input.snapshotKey);
-              await restoreWorkspace(ops, snapshotWorkdir(input.sandboxId), body, signal);
-            }
-          }
           const result = await adapter.runCodingTask(ops, input, emit, { signal });
           checkCancelled();
           let pullUrl: string | undefined;

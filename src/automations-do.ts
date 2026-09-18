@@ -202,10 +202,9 @@ export class Automations {
       if (!automation) {
         return Response.json({ error: "Automation not found." }, { status: 404 });
       }
-      const secret =
-        request.headers.get("x-automation-secret") ??
-        new URL(request.url).searchParams.get("secret") ??
-        "";
+      // Header only: a ?secret= query param lands in proxy and access logs,
+      // which is exactly where a credential must not appear.
+      const secret = request.headers.get("x-automation-secret") ?? "";
       if (!verifyWebhookSecret(automation, secret)) {
         return Response.json({ error: "Invalid automation secret." }, { status: 401 });
       }

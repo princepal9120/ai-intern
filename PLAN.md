@@ -52,9 +52,9 @@
 
 ## 2. Corrected Current State
 
-### 2.0 Status as of rev 4 (2026-09-17)
+### 2.0 Status as of rev 5 (2026-09-18)
 
-Baseline: **333 tests passing across 28 files**, typecheck and lint clean. Earlier counts ("269/21", "111/111") are stale everywhere they appear below.
+Baseline: **374 tests passing across 30 files**, typecheck and lint clean, `wrangler deploy --dry-run` green (OrbStack). Earlier counts ("333/28", "269/21", "111/111") are stale everywhere they appear below.
 
 | Task | State |
 |---|---|
@@ -67,7 +67,7 @@ Baseline: **333 tests passing across 28 files**, typecheck and lint clean. Earli
 | **T19 `run_when` gate · T20 automation safety** | **Done.** TypeSafe Noul when `TYPESAFE_API_KEY` is set (noul ≥ 0.8 to run), else Workers AI YES/NO; both fail closed. Approval by default, narrow opt-in unattended mode, daily budget, two kill switches. |
 | **B10 concurrency** | **Fixed in rev 4.** `MAX_CONCURRENT_RUNS` was still 3 while `max_instances` was already 5 — T2 had only been half-applied. |
 | **T22 Claude Code / Codex adapters · T23 provider choice (B11)** | **Done in rev 4.** The seam had to widen first: `configPath` and the container env were still OpenCode-hardcoded in `runtime.ts`, so a second harness could not have worked. `AgentHarness` now owns `supportedProviders`, `egressHosts(model)`, `configFile()`, and `env()`. `allowedHosts` is narrowed per run via `approveHarnessEgress` to the selected harness's provider host plus git — never the union. **Caveat: neither new CLI is in the shipped image**, so both are unit-tested and unproven live. |
-| **T10 live acceptance run** | **Blocked, not skipped.** No Docker CLI here and `spec/GOAL.md` forbids deploying. `wrangler deploy --dry-run` therefore still cannot validate T1–T3. |
+| **T10 live acceptance run** | **Blocked on a Cloudflare account, not on tooling.** `spec/GOAL.md` forbids deploying from the build environment. The `wrangler deploy --dry-run` gap is closed as of 2026-09-18 (rev 5): with the OrbStack daemon running, the dry run builds the image and validates T1–T3. |
 
 **The honest summary:** every task that can be completed without a cloud account is now done. **T10 is the only thing left**, it cannot be done from this environment, and no amount of further coding changes that. The remaining work is a Docker-capable machine and a Cloudflare account, not more code.
 

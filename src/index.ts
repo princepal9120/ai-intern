@@ -58,7 +58,7 @@ function automationsStub(env: Env) {
 
 async function handleRuns(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
-  if (!/^\/api\/runs(?:\/[^/]+(?:\/(?:stop|resume|fork))?)?$/.test(url.pathname)) {
+  if (!/^\/api\/runs(?:\/[^/]+)?$/.test(url.pathname)) {
     return null;
   }
   if (!isAuthenticated(request, env)) {
