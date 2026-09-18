@@ -35,6 +35,7 @@ import {
 } from "../pending-approvals.js";
 import { makeSandboxId, parseGitHubRepoUrl, redactSecrets } from "../security.js";
 import { evaluateResultQuality } from "../result-quality.js";
+import { HARNESS_DEFAULT_MODELS, allowedHostsFor, resolveHarness } from "../harness/index.js";
 import { OpenCodeAgent } from "./opencode-agent.js";
 
 export interface OrchestratorState {
@@ -55,12 +56,25 @@ const delegateInputSchema = z.object({
     .optional()
     .default(false)
     .describe("Open a pull request with the result. Requires GITHUB_TOKEN."),
+  harness: z
+    .enum(["opencode", "claude-code", "codex"])
+    .optional()
+    .describe(
+      "Coding agent harness. Defaults to the deployment's AGENT_HARNESS, else opencode. " +
+        "claude-code needs an anthropic/* model; codex needs an openai/* model.",
+    ),
+  codingModel: z
+    .string()
+    .optional()
+    .describe(
+      "Coding model as provider/model, e.g. google/gemini-3.5-flash-lite. " +
+        "Defaults to the deployment's per-harness model.",
+    ),
 });
 
 type DelegateInput = z.infer<typeof delegateInputSchema>;
 
 const DEFAULT_ORCHESTRATOR_MODEL = "@cf/meta/llama-3.1-8b-instruct";
-const DEFAULT_CODING_MODEL = "google/gemini-3.5-flash-lite";
 
 export class CodingOrchestrator extends Think<Env, OrchestratorState> {
   /** The orchestrator plans and delegates; it never runs shell commands. */
@@ -113,6 +127,8 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
       "You are AI Intern, a planning and delegation agent.",
       "You never edit repositories yourself. When the user describes a coding task,",
       "call delegate_coding_task with the repository URL and the task.",
+      "Pass the harness the user asked for (opencode, claude-code, or codex) when they name one,",
+      "and a codingModel as provider/model when they name a model; otherwise leave both unset.",
       "The tool requires human approval before anything runs: summarize exactly",
       "what will happen (repository, branch, task, whether a pull request is requested).",
       "After the run finishes, report the summary, changed files, and diff to the user.",
@@ -143,6 +159,25 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
       },
     });
     return { ...super.getTools(), delegate_coding_task: delegate };
+  }
+
+  private resolveHarnessAndModel(input: DelegateInput): { harness: string; codingModel: string } {
+    const harnessName = input.harness ?? this.env.AGENT_HARNESS?.trim() ?? "opencode";
+    const harness = resolveHarness(harnessName);
+    const perHarnessVar =
+      harness.name === "opencode"
+        ? this.env.CODING_MODEL?.trim()
+        : harness.name === "claude-code"
+          ? this.env.CLAUDE_CODE_MODEL?.trim()
+          : this.env.CODEX_MODEL?.trim();
+    const codingModel =
+      input.codingModel?.trim() ||
+      perHarnessVar ||
+      (HARNESS_DEFAULT_MODELS[harness.name] as string);
+    // Throws on an unsupported provider for this harness (T23) — here, at
+    // approval time, so the failure surfaces before a container starts.
+    allowedHostsFor(harness, codingModel);
+    return { harness: harness.name, codingModel };
   }
 
   private async executeDelegatedTask(
@@ -176,6 +211,10 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
           "Set the GITHUB_TOKEN secret or retry without requesting a pull request.",
       );
     }
+    // Resolve harness + model HERE, at approval time: the human approves the
+    // exact harness and model that will execute, and an unsupported
+    // harness/model pair fails before a container starts — not inside one.
+    const { harness: resolvedHarness, codingModel } = this.resolveHarnessAndModel(input);
     const sandboxId = makeSandboxId(input.repoUrl, input.task, callId);
     const fullInput: CodingTaskInput = {
       repoUrl: input.repoUrl,
@@ -183,7 +222,8 @@ export class CodingOrchestrator extends Think<Env, OrchestratorState> {
       baseBranch: input.baseBranch,
       publishPullRequest: input.publishPullRequest,
       sandboxId,
-      codingModel: this.env.CODING_MODEL || DEFAULT_CODING_MODEL,
+      codingModel,
+      harness: resolvedHarness as CodingTaskInput["harness"],
     };
     if (!reserved) this.store.add(
       createRun({

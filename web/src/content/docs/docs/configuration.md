@@ -9,9 +9,11 @@ Non-secret defaults live in wrangler.jsonc. Local overrides and secrets may be p
 | --- | --- | --- |
 | GATEWAY_ID | default | Account-owned AI Gateway selected by the AI binding |
 | ORCHESTRATOR_MODEL | @cf/meta/llama-3.1-8b-instruct | Parent planning via Workers AI |
-| CODING_MODEL | google/gemini-3.5-flash-lite | Coding model; validated against the selected harness |
+| CODING_MODEL | google/gemini-3.5-flash-lite | OpenCode coding model; validated against the selected harness |
+| CLAUDE_CODE_MODEL | anthropic/claude-sonnet-4-6 | Coding model when the claude-code harness is selected |
+| CODEX_MODEL | openai/gpt-5.3-codex | Coding model when the codex harness is selected |
 | RUNTIME | sandbox | Default adapter; computer refuses execution |
-| AGENT_HARNESS | opencode | opencode, claude-code, or codex |
+| AGENT_HARNESS | opencode | Default harness; a run may override it from the dashboard |
 
 Provider traffic is intercepted at Sandbox egress. There is no public `/api/provider` callback. Keep provider keys in AI Gateway BYOK; they never enter the container.
 

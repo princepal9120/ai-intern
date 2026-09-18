@@ -1,21 +1,24 @@
 ---
 title: Claude Code & OpenCode Harnesses
-description: Running OpenCode (shipped) and Claude Code / Codex (unit-tested, not in the image) inside Sandbox containers.
+description: Running OpenCode, Claude Code, or Codex inside Sandbox containers — chosen per task from the dashboard.
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-**Current behavior (as implemented):** the Dockerfile installs `opencode-ai@1.18.31` only. `AGENT_HARNESS=claude-code` or `codex` is unit-tested and fails at exec until a matching image exists.
+**Current behavior (as implemented):** one image carries all three CLIs (`opencode-ai@1.18.31`, `@anthropic-ai/claude-code@2.1.277`, `@openai/codex@0.155.0`), and a run picks its harness at approval time. The dashboard's New Coding Task form has a harness picker; `delegate_coding_task` accepts optional `harness` and `codingModel` inputs, validated before a container starts. Only OpenCode has been exercised against a live CLI; the Claude Code and Codex event parsers are asserted from their documented stream formats and pinned by CLI version.
 
 **Specification target (GOAL / PLAN T22):** API-key harnesses only. Subscription credentials are not proxied.
 
 <CardGrid>
-  <Card title="OpenCode (shipped image)" icon="setting">
-    Default. Dummy key in the container; Sandbox egress swaps in the AI Gateway credential for `generativelanguage.googleapis.com`.
+  <Card title="OpenCode" icon="setting">
+    Default. Multi-provider (google / anthropic / openai). Dummy key in the container; Sandbox egress swaps in the AI Gateway credential.
   </Card>
-  <Card title="Claude Code / Codex (not in image)" icon="puzzle">
-    Adapters live in `src/harness/`. Same dummy-key pattern for `api.anthropic.com` and `api.openai.com`. `allowedHosts` is the selected harness plus git, never the union.
+  <Card title="Claude Code" icon="puzzle">
+    `anthropic/*` models, e.g. `anthropic/claude-sonnet-4-6`. Stream format: `--print --output-format stream-json`.
+  </Card>
+  <Card title="Codex" icon="puzzle">
+    `openai/*` models, e.g. `openai/gpt-5.3-codex`. Stream format: `codex exec --json`.
   </Card>
 </CardGrid>
 
-Set `AGENT_HARNESS` as a Worker var. There is no per-task `harness` field on `delegate_coding_task`. `registry.npmjs.org` is not on the egress allowlist, so `npm install` inside a run is refused.
+Per-run selection beats the deploy default: the dashboard harness picker (or the delegate tool's `harness` input) overrides `AGENT_HARNESS`. An unsupported harness/model pair fails on the approval card, never inside a container the human already approved. `registry.npmjs.org` is not on the egress allowlist, so `npm install` inside a run is refused.

@@ -39,6 +39,11 @@ vi.mock("ai", () => ({
 }));
 
 import { App } from "../dashboard/src/app";
+import { VMInspector } from "../dashboard/src/components/VMInspector";
+import { RunRegistryView } from "../dashboard/src/components/RunRegistryView";
+import { AutomationsView } from "../dashboard/src/components/AutomationsView";
+import { ArchitectureView } from "../dashboard/src/components/ArchitectureView";
+import { OnboardingModal, ONBOARDING_STEPS } from "../dashboard/src/components/OnboardingModal";
 import { TaskForm } from "../web/src/components/TaskForm";
 
 afterEach(() => {
@@ -59,6 +64,8 @@ describe("dashboard rendering", () => {
     const markup = renderApp();
 
     expect(markup).toContain("No messages yet. Submit a task to start.");
+    expect(markup).toContain("Setup Guide");
+    expect(markup).toContain("View Setup Checklist &amp; Architecture");
     expect(markup).toContain("No live runs. Approved tasks appear here while they execute.");
     expect(markup).toContain("No retained runs on the orchestrator yet.");
   });
@@ -153,5 +160,95 @@ describe("dashboard rendering", () => {
     expect(markup).toContain("removed line");
     expect(markup).toContain("<pre");
     expect(markup).toContain("<code");
+  });
+
+  it("renders the top navigation bar with all architectural views", () => {
+    const markup = renderApp();
+    expect(markup).toContain("Task Console");
+    expect(markup).toContain("VM Inspector");
+    expect(markup).toContain("Run Registry");
+    expect(markup).toContain("Automations");
+    expect(markup).toContain("Architecture");
+  });
+
+  it("renders VMInspector with workspace inspection, diff and terminal tabs", () => {
+    const runs = [
+      {
+        runId: "run-vm-1",
+        sandboxId: "sb-1",
+        repoUrl: "https://github.com/owner/repo",
+        task: "Build feature",
+        baseBranch: "main",
+        publishPullRequest: false,
+        status: "completed",
+        createdAt: Date.now() - 60000,
+        updatedAt: Date.now(),
+        summary: "Feature built successfully.",
+        diff: "diff --git a/app.ts b/app.ts\n+const x = 1;",
+      },
+    ];
+    const markup = renderToStaticMarkup(React.createElement(VMInspector, { runs }));
+    expect(markup).toContain("VM Inspector");
+    expect(markup).toContain("Changes &amp; Diff");
+    expect(markup).toContain("Workspace Files");
+    expect(markup).toContain("Terminal &amp; Exec");
+    expect(markup).toContain("Web Preview");
+    expect(markup).toContain("Share VM View");
+    expect(markup).toContain("diff --git");
+  });
+
+  it("renders RunRegistryView with stats, search and filters", () => {
+    const runs = [
+      {
+        runId: "run-reg-1",
+        sandboxId: "sb-1",
+        repoUrl: "https://github.com/owner/repo",
+        task: "Fix bug",
+        baseBranch: "main",
+        publishPullRequest: true,
+        status: "completed",
+        createdAt: Date.now() - 30000,
+        updatedAt: Date.now(),
+      },
+    ];
+    const markup = renderToStaticMarkup(React.createElement(RunRegistryView, {
+      runs,
+      onInspectVM: () => {},
+      onReuseParams: () => {},
+      onCancelRun: () => {},
+      onClearHistory: () => {},
+      onRefresh: () => {},
+    }));
+    expect(markup).toContain("Run Registry &amp; Workspaces");
+    expect(markup).toContain("Total Runs");
+    expect(markup).toContain("Inspect Virtual Machine");
+    expect(markup).toContain("Fix bug");
+  });
+
+  it("renders AutomationsView with webhook endpoints", () => {
+    const markup = renderToStaticMarkup(React.createElement(AutomationsView));
+    expect(markup).toContain("Automations &amp; Inbound Triggers");
+    expect(markup).toContain("/api/github/webhook");
+    expect(markup).toContain("/api/slack/command");
+  });
+
+  it("renders ArchitectureView with isolation boundaries", () => {
+    const markup = renderToStaticMarkup(React.createElement(ArchitectureView));
+    expect(markup).toContain("System Architecture &amp; Isolation Boundary");
+    expect(markup).toContain("Isolated Sandbox VM");
+  });
+  it("renders OnboardingModal with steps from PLAN.md", () => {
+    expect(ONBOARDING_STEPS.length).toBe(6);
+    const markup = renderToStaticMarkup(React.createElement(OnboardingModal, {
+      isOpen: true,
+      onClose: () => {},
+      onSelectStarterTask: () => {},
+    }));
+    expect(markup).toContain("Setup &amp; Onboarding Guide");
+    expect(markup).toContain("Cloudflare Workers Paid &amp; Container Sandbox");
+    expect(markup).toContain("Cloudflare AI Gateway &amp; Stored BYOK Keys");
+    expect(markup).toContain("Cloudflare Access &amp; Webhook Bypass Policies");
+    expect(markup).toContain("GitHub Personal Access Token &amp; Repo Scoping");
+    expect(markup).toContain("First Live Run &amp; Approval Gate");
   });
 });

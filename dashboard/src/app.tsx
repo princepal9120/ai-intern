@@ -11,6 +11,11 @@ import { useAgent, useAgentToolEvents } from "agents/react";
 import { isToolUIPart, type UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DiffViewer } from "./components/DiffViewer";
+import { VMInspector, type VMRun } from "./components/VMInspector";
+import { RunRegistryView } from "./components/RunRegistryView";
+import { AutomationsView } from "./components/AutomationsView";
+import { ArchitectureView } from "./components/ArchitectureView";
+import { OnboardingModal } from "./components/OnboardingModal";
 import { TaskForm } from "../../web/src/components/TaskForm";
 import {
   extractPendingApprovals,
@@ -146,6 +151,7 @@ export function App(): React.JSX.Element {
   const [baseBranch, setBaseBranch] = useState("main");
   const [task, setTask] = useState("");
   const [publishPullRequest, setPublishPullRequest] = useState(false);
+  const [harness, setHarness] = useState("opencode");
   const [refreshToken, setRefreshToken] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -153,7 +159,30 @@ export function App(): React.JSX.Element {
   const [clearing, setClearing] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "active" | "completed">("all");
+  const [mainView, setMainView] = useState<"tasks" | "vm" | "runs" | "automations" | "architecture">("tasks");
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab") || params.get("view");
+      const runParam = params.get("run");
+      if (runParam) {
+        setSelectedRunId(runParam);
+        setMainView("vm");
+      } else if (tabParam === "vm" || tabParam === "vm-inspector") {
+        setMainView("vm");
+      } else if (tabParam === "runs" || tabParam === "run-registry") {
+        setMainView("runs");
+      } else if (tabParam === "automations") {
+        setMainView("automations");
+      } else if (tabParam === "architecture") {
+        setMainView("architecture");
+      }
+    }
+  }, []);
 
   const submitFailed = useRef(false);
   const submitInFlight = useRef(false);
@@ -288,6 +317,7 @@ export function App(): React.JSX.Element {
       const text = [
         `Repository: ${repoUrl.trim()}`,
         `Base branch: ${branch}`,
+        `Coding agent harness: ${harness}`,
         `Open a pull request with the result: ${publishPullRequest ? "yes" : "no"}`,
         "",
         `Task: ${task.trim()}`,
@@ -308,7 +338,7 @@ export function App(): React.JSX.Element {
         setSubmitting(false);
       }
     },
-    [repoUrl, baseBranch, task, publishPullRequest, chat, refreshRuns],
+    [repoUrl, baseBranch, task, publishPullRequest, harness, chat, refreshRuns],
   );
 
   const confirmClearAll = useCallback(async () => {
@@ -360,6 +390,7 @@ export function App(): React.JSX.Element {
       } else if (e.key === "Escape") {
         setShowClearModal(false);
         setShowShortcutsModal(false);
+        setShowOnboardingModal(false);
       } else if (e.key === "?" && !["INPUT", "TEXTAREA"].includes((e.target as HTMLElement)?.tagName)) {
         setShowShortcutsModal((prev) => !prev);
       }
@@ -367,6 +398,52 @@ export function App(): React.JSX.Element {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [submitting, repoUrl, task, submitTask]);
+
+  const allRuns: VMRun[] = useMemo(() => {
+    const map = new Map<string, VMRun>();
+    for (const r of retainedRuns) {
+      map.set(r.runId, {
+        runId: r.runId,
+        sandboxId: r.sandboxId,
+        repoUrl: r.repoUrl,
+        task: r.task,
+        baseBranch: r.baseBranch,
+        publishPullRequest: r.publishPullRequest,
+        status: r.status,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        summary: r.summary,
+        error: r.error,
+        diff: r.diff,
+      });
+    }
+    for (const tr of toolRuns) {
+      const existing = map.get(tr.runId);
+      const completedDiff = extractCompletedDiff(tr);
+      if (existing) {
+        existing.status = tr.status || existing.status;
+        if (completedDiff) existing.diff = completedDiff;
+        if (tr.summary) existing.summary = tr.summary;
+        if (tr.error) existing.error = tr.error;
+      } else {
+        map.set(tr.runId, {
+          runId: tr.runId,
+          sandboxId: tr.runId,
+          repoUrl: repoUrl || "https://github.com/repository",
+          task: task || "Coding task in sandbox",
+          baseBranch: baseBranch || "main",
+          publishPullRequest: false,
+          status: tr.status || "running",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          summary: tr.summary,
+          error: tr.error,
+          diff: completedDiff || undefined,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.createdAt - a.createdAt);
+  }, [retainedRuns, toolRuns, repoUrl, task, baseBranch]);
 
   const activeSandboxCount = useMemo(() => {
     return toolRuns.filter((r) => r.status === "running" || r.status === "pending").length +
@@ -410,6 +487,72 @@ export function App(): React.JSX.Element {
           </a>
         </div>
 
+        {/* DESKTOP VIEW NAVIGATION TABS */}
+        <nav className="hidden md:flex items-center gap-1 bg-black p-1 rounded-xl border border-neutral-800 text-xs">
+          <button
+            type="button"
+            onClick={() => setMainView("tasks")}
+            className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+              mainView === "tasks"
+                ? "bg-[#1c2430] text-white font-semibold shadow-sm"
+                : "text-[#8b98a9] hover:text-white"
+            }`}
+          >
+            <span>🚀 Task Console</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMainView("vm")}
+            className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+              mainView === "vm"
+                ? "bg-[#1c2430] text-teal-400 font-semibold shadow-sm"
+                : "text-[#8b98a9] hover:text-teal-400"
+            }`}
+          >
+            <span>🖥️ VM Inspector</span>
+            {activeSandboxCount > 0 ? (
+              <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+            ) : null}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMainView("runs")}
+            className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+              mainView === "runs"
+                ? "bg-[#1c2430] text-white font-semibold shadow-sm"
+                : "text-[#8b98a9] hover:text-white"
+            }`}
+          >
+            <span>📋 Run Registry</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMainView("automations")}
+            className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+              mainView === "automations"
+                ? "bg-[#1c2430] text-white font-semibold shadow-sm"
+                : "text-[#8b98a9] hover:text-white"
+            }`}
+          >
+            <span>⚡ Automations</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMainView("architecture")}
+            className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+              mainView === "architecture"
+                ? "bg-[#1c2430] text-white font-semibold shadow-sm"
+                : "text-[#8b98a9] hover:text-white"
+            }`}
+          >
+            <span>🏗️ Architecture</span>
+          </button>
+        </nav>
+
         <div className="flex items-center gap-3 sm:gap-4">
           {/* Active Sandboxes Pill */}
           <div className="hidden sm:inline-flex items-center gap-1.5 border border-neutral-800 bg-black rounded-full px-2.5 py-1 text-xs font-mono text-[#8b98a9]">
@@ -447,6 +590,18 @@ export function App(): React.JSX.Element {
             ?
           </button>
 
+          {/* Onboarding Setup Guide */}
+          <button
+            type="button"
+            onClick={() => setShowOnboardingModal(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-300 hover:text-teal-200 border border-teal-500/40 hover:border-teal-400/80 bg-teal-950/50 hover:bg-teal-900/60 px-2.5 py-1 rounded-md transition-colors shadow-[0_0_8px_rgba(11,159,149,0.2)]"
+            title="Setup & Onboarding Guide"
+            aria-label="Setup & Onboarding Guide"
+          >
+            <span>🚀</span>
+            <span className="hidden sm:inline">Setup Guide</span>
+          </button>
+
           {/* Links */}
           <a
             href="/docs/"
@@ -457,6 +612,47 @@ export function App(): React.JSX.Element {
         </div>
       </header>
 
+      {/* MOBILE VIEW NAVIGATION TABS */}
+      <div className="md:hidden flex items-center justify-between px-3 py-2 bg-[#090b0e] border-b border-neutral-800 overflow-x-auto text-xs font-mono shrink-0 gap-1">
+        <button
+          type="button"
+          onClick={() => setMainView("tasks")}
+          className={`px-2.5 py-1 rounded whitespace-nowrap ${mainView === "tasks" ? "bg-teal-950 text-teal-300 font-bold border border-teal-800/60" : "text-[#8b98a9]"}`}
+        >
+          🚀 Console
+        </button>
+        <button
+          type="button"
+          onClick={() => setMainView("vm")}
+          className={`px-2.5 py-1 rounded whitespace-nowrap flex items-center gap-1.5 ${mainView === "vm" ? "bg-teal-950 text-teal-300 font-bold border border-teal-800/60" : "text-[#8b98a9]"}`}
+        >
+          <span>🖥️ VM View</span>
+          {activeSandboxCount > 0 ? <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" /> : null}
+        </button>
+        <button
+          type="button"
+          onClick={() => setMainView("runs")}
+          className={`px-2.5 py-1 rounded whitespace-nowrap ${mainView === "runs" ? "bg-teal-950 text-teal-300 font-bold border border-teal-800/60" : "text-[#8b98a9]"}`}
+        >
+          📋 Runs
+        </button>
+        <button
+          type="button"
+          onClick={() => setMainView("automations")}
+          className={`px-2.5 py-1 rounded whitespace-nowrap ${mainView === "automations" ? "bg-teal-950 text-teal-300 font-bold border border-teal-800/60" : "text-[#8b98a9]"}`}
+        >
+          ⚡ Automations
+        </button>
+        <button
+          type="button"
+          onClick={() => setMainView("architecture")}
+          className={`px-2.5 py-1 rounded whitespace-nowrap ${mainView === "architecture" ? "bg-teal-950 text-teal-300 font-bold border border-teal-800/60" : "text-[#8b98a9]"}`}
+        >
+          🏗️ Arch
+        </button>
+      </div>
+
+      {mainView === "tasks" ? (
       <div className="flex-1 flex flex-col xl:flex-row overflow-hidden">
         {/* SIDEBAR: Config & Task Form */}
         <aside className="w-full xl:w-96 border-r-0 xl:border-r border-neutral-800 bg-[#090b0e] flex flex-col shrink-0 h-auto xl:h-[calc(100vh-3.5rem)] overflow-y-auto">
@@ -503,6 +699,7 @@ export function App(): React.JSX.Element {
               task={task}
               baseBranch={baseBranch}
               publishPullRequest={publishPullRequest}
+              harness={harness}
               busy={busy}
               submitting={submitting}
               clearing={clearing}
@@ -510,6 +707,7 @@ export function App(): React.JSX.Element {
               onTaskChange={setTask}
               onBaseBranchChange={setBaseBranch}
               onPublishPullRequestChange={setPublishPullRequest}
+              onHarnessChange={setHarness}
               onSubmit={submitTask}
               onClear={() => setShowClearModal(true)}
             />
@@ -607,6 +805,14 @@ export function App(): React.JSX.Element {
                   <p className="text-xs text-[#8b98a9]/70 max-w-sm">
                     Shiba is ready. Enter a repository and describe the changes you want.
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowOnboardingModal(true)}
+                    className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-teal-300 hover:text-teal-200 border border-teal-500/40 bg-teal-950/60 hover:bg-teal-900/70 px-3.5 py-1.5 rounded-lg transition-colors shadow-[0_0_8px_rgba(11,159,149,0.3)]"
+                  >
+                    <span>🚀</span>
+                    <span>View Setup Checklist & Architecture</span>
+                  </button>
                 </div>
               ) : (
                 <ol className="flex flex-col gap-5">
@@ -855,7 +1061,23 @@ export function App(): React.JSX.Element {
                             </p>
                           ) : null}
 
-                          {run.status === "completed" && completedDiff ? (
+                          <div className="flex items-center gap-2 mb-3">
+                              <button
+                                type="button"
+                                className="text-xs bg-teal-950/60 hover:bg-teal-900 border border-teal-800/60 text-teal-300 font-medium py-1.5 px-3 rounded-md transition-colors flex items-center gap-1.5"
+                                onClick={() => {
+                                  setSelectedRunId(run.runId);
+                                  setMainView("vm");
+                                }}
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                <span>Inspect VM</span>
+                              </button>
+                            </div>
+                            {run.status === "completed" && completedDiff ? (
                             <div className="mt-3">
                               <DiffViewer diff={completedDiff} runId={run.runId} />
                             </div>
@@ -962,6 +1184,20 @@ export function App(): React.JSX.Element {
 
                                 <button
                                   type="button"
+                                  className="text-xs bg-teal-950/60 hover:bg-teal-900 border border-teal-800/60 text-teal-300 font-medium py-1.5 px-3 rounded-md transition-colors flex items-center gap-1.5"
+                                  onClick={() => {
+                                    setSelectedRunId(run.runId);
+                                    setMainView("vm");
+                                  }}
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </svg>
+                                  <span>Inspect VM</span>
+                                </button>
+                                <button
+                                  type="button"
                                   className="text-xs bg-black hover:bg-[#2a3441] border border-neutral-800 text-[#8b98a9] hover:text-[#e6edf3] font-medium py-1.5 px-3 rounded-md transition-colors"
                                   onClick={() => {
                                     setRepoUrl(run.repoUrl);
@@ -984,6 +1220,35 @@ export function App(): React.JSX.Element {
           </div>
         </main>
       </div>
+      ) : mainView === "vm" ? (
+        <VMInspector
+          runs={allRuns}
+          selectedRunId={selectedRunId}
+          onSelectRun={(id) => setSelectedRunId(id)}
+        />
+      ) : mainView === "runs" ? (
+        <RunRegistryView
+          runs={retainedRuns}
+          onInspectVM={(id) => {
+            setSelectedRunId(id);
+            setMainView("vm");
+          }}
+          onReuseParams={(run) => {
+            setRepoUrl(run.repoUrl);
+            setBaseBranch(run.baseBranch);
+            setTask(run.task);
+            setPublishPullRequest(run.publishPullRequest);
+            setMainView("tasks");
+          }}
+          onCancelRun={cancelRun}
+          onClearHistory={() => setShowClearModal(true)}
+          onRefresh={refreshRuns}
+        />
+      ) : mainView === "automations" ? (
+        <AutomationsView />
+      ) : (
+        <ArchitectureView />
+      )}
 
       {/* CLEAR HISTORY CONFIRMATION MODAL */}
       {showClearModal ? (
@@ -1012,6 +1277,17 @@ export function App(): React.JSX.Element {
           </div>
         </div>
       ) : null}
+
+      {/* ONBOARDING SETUP MODAL */}
+      <OnboardingModal
+        isOpen={showOnboardingModal}
+        onClose={() => setShowOnboardingModal(false)}
+        onSelectStarterTask={(repo, t, h) => {
+          setRepoUrl(repo);
+          setTask(t);
+          setHarness(h);
+        }}
+      />
 
       {/* KEYBOARD SHORTCUTS MODAL */}
       {showShortcutsModal ? (

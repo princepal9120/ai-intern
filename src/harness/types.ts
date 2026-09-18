@@ -12,7 +12,8 @@
  */
 import type { CodingTaskInput } from "../opencode-input.js";
 
-export type AgentHarnessName = "opencode" | "claude-code" | "codex" | "aider";
+/** Implemented harnesses. Aider was in the original sketch but has no adapter — add it here with one, not before. */
+export type AgentHarnessName = "opencode" | "claude-code" | "codex";
 
 /** Provider id → the single host its API lives on. Feeds allowedHosts (T5). */
 export const PROVIDER_HOSTS: Record<string, string> = {

@@ -165,7 +165,9 @@ export class OpenCodeAgent extends AIChatAgent<Env> {
           if (input.publishPullRequest && !this.env.GITHUB_TOKEN) {
             throw new Error("publishPullRequest was requested but GITHUB_TOKEN is not configured.");
           }
-          const harness = resolveHarness(this.env.AGENT_HARNESS);
+          // The approval froze the harness (and model) for this run. The
+          // deployment default is only the fallback for pre-harness inputs.
+          const harness = resolveHarness(input.harness ?? this.env.AGENT_HARNESS);
           const adapter = createRuntimeAdapter(resolveRuntimeName(this.env.RUNTIME), harness);
           const hosts = allowedHostsFor(harness, input.codingModel);
           const ops = createSandboxOps(this.env, input.sandboxId, hosts);

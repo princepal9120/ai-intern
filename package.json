@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src dashboard test",
     "test": "vitest run",
+    "test:live": "vitest run test/typesafe-live.test.ts",
     "build": "pnpm run build:dashboard && pnpm run docs:build && node scripts/copy-docs.mjs && pnpm run docs:verify",
     "docs:dev": "cd web && astro dev --port 4321",
     "docs:build": "astro build --root web",

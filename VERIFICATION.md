@@ -22,7 +22,7 @@
 
 Specifically unmeasured: peak container memory (which decides `basic` vs `standard-1`, and per PLAN.md §8 is the binding cost constraint), cold-start time, and whether the `agents` SDK uses the WebSocket Hibernation API.
 
-**The Claude Code and Codex harnesses are not runnable from the shipped image.** The Dockerfile installs `opencode-ai` only. Their config, argv, env, and event parsers are unit-tested; neither has been run against a live CLI, so their stream formats are asserted from documentation, not observation. Setting `AGENT_HARNESS=claude-code` or `codex` today fails at exec.
+**The Claude Code and Codex CLIs ship in the image but have not run live.** The Dockerfile installs `opencode-ai@1.18.31`, `@anthropic-ai/claude-code@2.1.277`, and `@openai/codex@0.155.0`, and the image build verifies each binary reports its version. Their config, argv, env, and event parsers are unit-tested against their documented stream formats; neither has been run against the live API, so a stream-format drift would surface at the first real run, not before. The dashboard's harness picker is wired end to end; only OpenCode has completed a live run.
 
 ## What the 374 tests do cover
 
@@ -33,6 +33,12 @@ Specifically unmeasured: peak container memory (which decides `basic` vs `standa
 - Run result envelope parsing (an `error` envelope never reads `completed`), Slack signature verification and replay bounds, approver allowlisting, burst grouping, cron parsing and coalescing, GitHub tree publishing including deletions.
 
 ## Fix history
+
+**2026-09-18 (per-run harness selection + live TypeSafe check)**
+- **End-to-end harness selection.** The dashboard's New Coding Task form now picks the harness per run (OpenCode / Claude Code / Codex). `delegate_coding_task` accepts optional `harness` and `codingModel`; the orchestrator resolves them at approval time — an unknown harness or a harness/model mismatch fails on the approval card, never inside a container the human already approved. The child agent runs the approved harness, not the deploy default (`AGENT_HARNESS` remains the fallback). Per-harness models: `CODING_MODEL` (OpenCode), `CLAUDE_CODE_MODEL` (default `anthropic/claude-sonnet-4-6`), `CODEX_MODEL` (default `openai/gpt-5.3-codex`).
+- **One image, three CLIs.** The Dockerfile installs `opencode-ai@1.18.31`, `@anthropic-ai/claude-code@2.1.277`, and `@openai/codex@0.155.0`, and the build fails unless every binary reports its version. A Docker run confirmed all three execute inside the container (amd64 emulation).
+- **LIVE TypeSafe check added** (`test/typesafe-live.test.ts`, `pnpm test:live`). Auto-skips without a key; with `TYPESAFE_API_KEY` (env or `.dev.vars`, gitignored) it proves the three wired integrations against the real System One API: Noul run_when gate (matching runs, newsletter skips — fail closed both ways), Choice Slack intent, Score result quality. Mocked tests cannot establish any of this.
+- Fixed type/lint errors in the concurrently-added `src/sandbox-routes.ts` (`timeoutMs` → SDK's `timeout`; narrowed a possibly-undefined regex capture) and removed the now-dead `DEFAULT_CODING_MODEL` constant in the orchestrator.
 
 **2026-09-18 (code-review findings pass)**
 - One TypeSafe System One client (`src/typesafe.ts`): `postSystemOne` + typed `readNoulAnswer`/`readChoiceAnswer`/`readScoreAnswer` replace the three hand-rolled copies of the endpoint constant, Bearer envelope, and null-on-error handling in `automations.ts`, `result-quality.ts`, and `slack-mention.ts`. Policy stays in the callers — the run_when gate fails closed, intent classification and quality scoring fail open.

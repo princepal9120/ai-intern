@@ -39,6 +39,7 @@ export default defineConfig({
 					items: [
 						{ label: 'Overview', slug: 'docs/overview' },
 						{ label: 'Quickstart', slug: 'docs/getting-started' },
+						{ label: 'End-to-End Onboarding Setup', slug: 'docs/onboarding' },
 					],
 				},
 				{

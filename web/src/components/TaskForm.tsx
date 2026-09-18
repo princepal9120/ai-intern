@@ -5,6 +5,7 @@ export interface TaskFormProps {
   task?: string;
   baseBranch?: string;
   publishPullRequest?: boolean;
+  harness?: string;
   busy?: boolean;
   submitting?: boolean;
   clearing?: boolean;
@@ -12,9 +13,16 @@ export interface TaskFormProps {
   onTaskChange?: (value: string) => void;
   onBaseBranchChange?: (value: string) => void;
   onPublishPullRequestChange?: (value: boolean) => void;
+  onHarnessChange?: (value: string) => void;
   onSubmit?: (event: SyntheticEvent) => void;
   onClear?: () => void;
 }
+
+const HARNESS_OPTIONS: { value: string; label: string; hint: string }[] = [
+  { value: "opencode", label: "OpenCode (default)", hint: "Google / Anthropic / OpenAI models" },
+  { value: "claude-code", label: "Claude Code", hint: "Anthropic models — needs the gateway's Anthropic key" },
+  { value: "codex", label: "Codex", hint: "OpenAI models — needs the gateway's OpenAI key" },
+];
 
 // Built with createElement (no JSX): the Astro tsconfig covering web/
 // preserves JSX, which the root vitest transform cannot parse here.
@@ -23,6 +31,7 @@ export function TaskForm({
   task = "",
   baseBranch = "main",
   publishPullRequest = false,
+  harness = "opencode",
   busy = false,
   submitting = false,
   clearing = false,
@@ -30,6 +39,7 @@ export function TaskForm({
   onTaskChange,
   onBaseBranchChange,
   onPublishPullRequestChange,
+  onHarnessChange,
   onSubmit,
   onClear,
 }: TaskFormProps = {}) {
@@ -91,6 +101,29 @@ export function TaskForm({
         onChange: (event: { target: { value: string } }) =>
           onTaskChange?.(event.target.value),
       }),
+    ),
+    createElement(
+      "label",
+      { className: "flex flex-col gap-1.5" },
+      createElement("span", { className: labelClass }, "Coding agent"),
+      createElement(
+        "select",
+        {
+          name: "harness",
+          value: harness,
+          className: inputClass,
+          onChange: (event: { target: { value: string } }) =>
+            onHarnessChange?.(event.target.value),
+        },
+        ...HARNESS_OPTIONS.map((option) =>
+          createElement("option", { key: option.value, value: option.value }, option.label),
+        ),
+      ),
+      createElement(
+        "span",
+        { className: "text-xs text-gray-500" },
+        HARNESS_OPTIONS.find((option) => option.value === harness)?.hint ?? "",
+      ),
     ),
     createElement(
       "label",

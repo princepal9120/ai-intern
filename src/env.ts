@@ -19,8 +19,12 @@ export interface Env {
   GATEWAY_ID: string;
   /** Model id for the parent planning agent (Workers AI id). */
   ORCHESTRATOR_MODEL: string;
-  /** Coding model in opencode provider/model format, e.g. google/gemini-3.5-flash-lite. */
+  /** Coding model in provider/model format, e.g. google/gemini-3.5-flash-lite. */
   CODING_MODEL: string;
+  /** Optional default model for the claude-code harness, e.g. anthropic/claude-sonnet-4-6. */
+  CLAUDE_CODE_MODEL?: string;
+  /** Optional default model for the codex harness, e.g. openai/gpt-5.3-codex. */
+  CODEX_MODEL?: string;
   /** Optional kill switch. "false"/"0"/"off" stops every automation firing. */
   AUTOMATIONS_ENABLED?: string;
   /** Agent harness: "opencode" (default), "claude-code", or "codex". */

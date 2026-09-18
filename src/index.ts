@@ -18,6 +18,7 @@ import { handleSlackInteract } from "./slack-approval.js";
 import { handleSlackEvents } from "./slack-events.js";
 import { handleSlackEvent } from "./slack-mention.js";
 import { ORCHESTRATOR_NAME, handleSlackCommand } from "./slack-routes.js";
+import { handleSandboxRoutes } from "./sandbox-routes.js";
 
 export { Automations, CodingOrchestrator, OpenCodeAgent, Sandbox, ContainerProxy };
 export { assertLiveCodingModel } from "./coding-model.js";
@@ -185,6 +186,10 @@ export default {
       const runsResponse = await handleRuns(request, env);
       if (runsResponse) {
         return runsResponse;
+      }
+      const sandboxRouteResponse = await handleSandboxRoutes(request, env);
+      if (sandboxRouteResponse) {
+        return sandboxRouteResponse;
       }
       const slackEventsResponse = await handleSlackEvents(
         request,

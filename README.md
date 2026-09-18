@@ -155,11 +155,11 @@ Safety, all three required together: approval by default, opt-in unattended mode
 
 ## Agent harnesses
 
-Three, selected with `AGENT_HARNESS`: `opencode` (default, `opencode run --format json`), `claude-code` (`claude --print --output-format stream-json`), and `codex` (`codex exec --json`). Aider is not implemented.
+Three, shipped in one pinned image: `opencode` (default, `opencode run --format json`), `claude-code` (`claude --print --output-format stream-json`), and `codex` (`codex exec --json`). Aider is not implemented. The dashboard's New Coding Task form picks the harness per run; `AGENT_HARNESS` is only the deployment default.
 
 Claude Code and Codex are **API-key harnesses only**. Subscription credentials are deliberately not proxied: Anthropic's terms forbid third parties routing requests through Free, Pro, or Max plan credentials on behalf of users.
 
-The credential invariant holds for every harness — the container receives a dummy key and the real one is injected outside it at the egress boundary. `allowedHosts` is narrowed per run to the *selected* harness's provider host plus git, never the union across harnesses. Only OpenCode has been exercised end to end; the Claude Code and Codex event parsers are unit-tested but unproven against a live CLI, and their CLIs are not in the shipped image.
+The credential invariant holds for every harness — the container receives a dummy key and the real one is injected outside it at the egress boundary. `allowedHosts` is narrowed per run to the *selected* harness's provider host plus git, never the union across harnesses. All three CLIs are in the shipped image (versions pinned in the `Dockerfile`); only OpenCode has been exercised against a live CLI — the Claude Code and Codex event parsers are asserted from their documented stream formats until T10 proves otherwise.
 
 The computer adapter deliberately refuses execution — `@cloudflare/computer` is preview-only, so Sandbox remains the default.
 

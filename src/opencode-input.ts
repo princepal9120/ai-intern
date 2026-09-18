@@ -16,6 +16,8 @@ const codingTaskInputSchema = z.object({
   publishPullRequest: z.boolean(),
   sandboxId: z.string().min(1),
   codingModel: z.string().min(1),
+  /** Which coding agent runs the task. Validated at approval time, never in the container. */
+  harness: z.enum(["opencode", "claude-code", "codex"]).optional(),
 });
 
 export type CodingTaskInput = z.infer<typeof codingTaskInputSchema>;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ClaudeCodeErrorEvent, claudeCodeHarness, parseClaudeCodeEvent } from "../src/harness/claude-code.js";
 import { CodexErrorEvent, codexHarness, parseCodexEvent } from "../src/harness/codex.js";
-import { allowedHostsFor, resolveHarness } from "../src/harness/index.js";
+import { allowedHostsFor, HARNESS_DEFAULT_MODELS, resolveHarness, resolveRunHarness } from "../src/harness/index.js";
 import { opencodeHarness } from "../src/harness/opencode.js";
 import { providerOf } from "../src/harness/types.js";
 import { createRuntimeAdapter } from "../src/runtime.js";
@@ -49,6 +49,41 @@ describe("the selected harness reaches the adapter that runs it", () => {
     // means the selection was dropped and egress would block its provider.
     expect(execs[0]).toMatch(/^'codex' 'exec'/);
     expect(execs[0]).not.toMatch(/opencode/);
+  });
+});
+
+describe("per-run harness selection end to end", () => {
+  it("the approved input's harness wins over the AGENT_HARNESS deploy default", () => {
+    expect(resolveRunHarness("codex", "opencode").name).toBe("codex");
+    expect(resolveRunHarness(undefined, "claude-code").name).toBe("claude-code");
+    expect(resolveRunHarness("", "").name).toBe("opencode");
+    expect(resolveRunHarness("  ", "codex").name).toBe("codex");
+    expect(() => resolveRunHarness("aider", undefined)).toThrow(/Unknown agent harness/);
+  });
+
+  it("the child runs the harness the approved input named, not the env default", async () => {
+    const execs: string[] = [];
+    // What the orchestrator froze into the delegation input after the human
+    // approved "codex" on a deployment whose AGENT_HARNESS is unset.
+    const approved = { ...input("openai/gpt-5.3-codex"), harness: "codex" as const };
+    const harness = resolveRunHarness(approved.harness, undefined);
+    const adapter = createRuntimeAdapter("sandbox", harness);
+    const ops = {
+      gitCheckout: async () => {},
+      writeFile: async () => { throw new Error("codex writes no config file"); },
+      exec: async (command: string) => { execs.push(command); return { stdout: "", stderr: "", exitCode: 0 }; },
+      readFile: async () => ({ kind: "utf8" as const, content: "" }),
+    };
+    await adapter.runCodingTask(ops, approved, async () => {});
+    expect(execs[0]).toMatch(/^'codex' 'exec'/);
+    expect(execs[0]).toContain("gpt-5.3-codex");
+  });
+
+  it("an unsupported provider for the approved harness fails at approval, not exec", () => {
+    // The orchestrator runs allowedHostsFor before the sandbox starts.
+    expect(() => allowedHostsFor(resolveRunHarness("claude-code", undefined), "openai/gpt-5.4")).toThrow(/supports anthropic/);
+    // The claude-code default model is anthropic/* and passes.
+    expect(allowedHostsFor(resolveRunHarness("claude-code", undefined), HARNESS_DEFAULT_MODELS["claude-code"] as string)).toContain("api.anthropic.com");
   });
 });
 

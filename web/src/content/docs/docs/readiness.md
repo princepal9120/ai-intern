@@ -14,7 +14,7 @@ The static documentation/dashboard build and mocked tests do not establish that 
 
 - **Live run (T10):** no dated cloud run is recorded. Local tests do not prove deploy, Access, or container billing. See `VERIFICATION.md`.
 - **Authorization:** `REQUIRE_ACCESS` only checks the Access email header — not JWT. Cover every hostname with Access; forge-header tests must still fail from outside Access.
-- **Harness image:** Dockerfile installs OpenCode only. `AGENT_HARNESS=claude-code` or `codex` fails at exec until a matching image exists.
+- **Harness run proof:** all three CLIs ship in the image (pinned in the `Dockerfile`); OpenCode has been exercised end to end, Claude Code and Codex parsers are unit-tested and unproven against a live CLI until T10.
 - **Private cloning:** path-scoped `GITHUB_TOKEN` is for github.com traffic of the approved repo; it is not a clone-time credential store.
 - **npm inside the sandbox:** `registry.npmjs.org` is off the egress allowlist on purpose.
 - **Lifecycle:** cancellation destroys the sandbox; idle tail is `sleepAfter = 1m`. Registry clear is not complete data erasure.
