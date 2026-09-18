@@ -94,3 +94,161 @@ describe("slack mention dispatch", () => {
     expect(queueRun).not.toHaveBeenCalled();
   });
 });
+
+import {
+  SLACK_INTENT_TYPES,
+  classifySlackMentionIntent,
+  intentHint,
+  type SlackMentionIntentResult,
+} from "../src/slack-mention.js";
+
+describe("classifySlackMentionIntent (TypeSafe Choice — T14 augmentation)", () => {
+  function choiceResponse(choice: string, probabilities?: Record<string, number>): Response {
+    const probs = probabilities ?? { [choice]: 0.85 };
+    return new Response(
+      JSON.stringify({
+        answers: { intent: { type: "choice", choice, probabilities: probs } },
+      }),
+      { status: 200 },
+    );
+  }
+
+  it("returns null when apiKey is absent", async () => {
+    const result = await classifySlackMentionIntent("", "fix the login bug", "bug thread");
+    expect(result).toBeNull();
+  });
+
+  it("returns null when apiKey is whitespace-only", async () => {
+    const result = await classifySlackMentionIntent("   ", "fix the login bug", "bug thread");
+    expect(result).toBeNull();
+  });
+
+  it("returns null when mentionText is empty", async () => {
+    const fetchImpl = async () => choiceResponse("fix");
+    const result = await classifySlackMentionIntent("ts-key", "", "context", fetchImpl);
+    expect(result).toBeNull();
+  });
+
+  it("classifies a bug fix request as fix", async () => {
+    const result = await classifySlackMentionIntent(
+      "ts-key",
+      "fix the 500 on /orders",
+      "",
+      async () => choiceResponse("fix", { fix: 0.92, implement: 0.04, explain: 0.02, other: 0.02 }),
+    );
+    expect(result).not.toBeNull();
+    expect(result!.intent).toBe("fix");
+    expect(result!.probability).toBeCloseTo(0.92, 5);
+  });
+
+  it("classifies a feature request as implement", async () => {
+    const result = await classifySlackMentionIntent(
+      "ts-key",
+      "add a dark mode toggle",
+      "",
+      async () => choiceResponse("implement", { fix: 0.05, implement: 0.88, explain: 0.04, other: 0.03 }),
+    );
+    expect(result).not.toBeNull();
+    expect(result!.intent).toBe("implement");
+  });
+
+  it("classifies an explanation request as explain", async () => {
+    const result = await classifySlackMentionIntent(
+      "ts-key",
+      "explain how the auth middleware works",
+      "",
+      async () => choiceResponse("explain"),
+    );
+    expect(result).not.toBeNull();
+    expect(result!.intent).toBe("explain");
+  });
+
+  it("maps unknown choice values to other", async () => {
+    const result = await classifySlackMentionIntent(
+      "ts-key",
+      "run the benchmarks",
+      "",
+      async () => choiceResponse("unknown-future-label"),
+    );
+    expect(result).not.toBeNull();
+    expect(result!.intent).toBe("other");
+  });
+
+  it("returns null on HTTP error (fail open — does not block runs)", async () => {
+    const result = await classifySlackMentionIntent(
+      "ts-key",
+      "fix tests",
+      "",
+      async () => new Response("error", { status: 500 }),
+    );
+    expect(result).toBeNull();
+  });
+
+  it("returns null on network error", async () => {
+    const result = await classifySlackMentionIntent(
+      "ts-key",
+      "fix tests",
+      "",
+      async () => { throw new Error("network down"); },
+    );
+    expect(result).toBeNull();
+  });
+
+  it("returns null when choice field is missing", async () => {
+    const bad = new Response(JSON.stringify({ answers: { intent: { type: "choice" } } }), { status: 200 });
+    const result = await classifySlackMentionIntent("ts-key", "fix tests", "", async () => bad);
+    expect(result).toBeNull();
+  });
+
+  it("sends the correct TypeSafe Choice request shape", async () => {
+    let captured: RequestInit | undefined;
+    const captureFetch: typeof fetch = async (_url, init) => {
+      captured = init;
+      return choiceResponse("fix");
+    };
+    await classifySlackMentionIntent("ts-key", "fix the login bug", "thread context", captureFetch);
+    const sent = JSON.parse(captured?.body as string);
+    expect(sent.model).toBe("jev-latest");
+    expect(sent.state).toEqual({ mention: "fix the login bug", thread: "thread context" });
+    expect(sent.questions.intent.type).toBe("choice");
+    const criteria = sent.questions.intent.criteria;
+    expect(criteria).toHaveProperty("fix");
+    expect(criteria).toHaveProperty("implement");
+    expect(criteria).toHaveProperty("explain");
+    expect(criteria).toHaveProperty("other");
+  });
+
+  it("covers all SLACK_INTENT_TYPES values", () => {
+    expect(SLACK_INTENT_TYPES).toContain("fix");
+    expect(SLACK_INTENT_TYPES).toContain("implement");
+    expect(SLACK_INTENT_TYPES).toContain("explain");
+    expect(SLACK_INTENT_TYPES).toContain("other");
+  });
+});
+
+describe("intentHint", () => {
+  it("returns a hint for fix intent", () => {
+    const r: SlackMentionIntentResult = { intent: "fix", probability: 0.9 };
+    expect(intentHint(r)).toContain("fix");
+  });
+
+  it("returns a hint for implement intent", () => {
+    const r: SlackMentionIntentResult = { intent: "implement", probability: 0.8 };
+    expect(intentHint(r)).toContain("implement");
+  });
+
+  it("returns a hint for explain intent", () => {
+    const r: SlackMentionIntentResult = { intent: "explain", probability: 0.7 };
+    expect(intentHint(r)).toContain("explanation");
+  });
+
+  it("returns empty string for other intent", () => {
+    const r: SlackMentionIntentResult = { intent: "other", probability: 0.5 };
+    expect(intentHint(r)).toBe("");
+  });
+
+  it("returns empty string when classification is null", () => {
+    expect(intentHint(null)).toBe("");
+  });
+});
+

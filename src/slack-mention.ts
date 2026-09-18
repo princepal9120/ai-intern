@@ -114,6 +114,112 @@ async function defaultFetchThread(token: string, channel: string, threadTs: stri
   return out;
 }
 
+
+export const SLACK_INTENT_TYPES = ["fix", "implement", "explain", "other"] as const;
+export type SlackMentionIntent = (typeof SLACK_INTENT_TYPES)[number];
+
+/** TypeSafe System One URL (same endpoint as automations.ts evaluateRunWhenTypeSafe). */
+const TYPESAFE_SYSTEMONE_URL_MENTION = "https://api.typesafe.ai/v1/systemone";
+
+/** Pluggable fetch for tests. */
+export type MentionFetchImpl = (input: string | URL, init?: RequestInit) => Promise<Response>;
+
+export interface SlackMentionIntentResult {
+  intent: SlackMentionIntent;
+  /** Probability [0, 1] that the chosen intent is correct. */
+  probability: number;
+}
+
+function readChoiceBody(raw: unknown): { choice: string; probability: number } | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const answers = (raw as { answers?: unknown }).answers;
+  if (typeof answers !== "object" || answers === null) return null;
+  const intent = (answers as { intent?: unknown }).intent;
+  if (typeof intent !== "object" || intent === null) return null;
+  const c = intent as { choice?: unknown; probabilities?: unknown };
+  if (typeof c.choice !== "string") return null;
+  const chosen = c.choice as string;
+  const probs =
+    typeof c.probabilities === "object" && c.probabilities !== null
+      ? (c.probabilities as Record<string, unknown>)
+      : {};
+  const probability = typeof probs[chosen] === "number" ? (probs[chosen] as number) : 0;
+  return { choice: chosen, probability };
+}
+
+/**
+ * Use TypeSafe Choice to classify what a Slack mention is asking for.
+ * Returns null when apiKey is absent, or on HTTP/parse failure — callers
+ * treat null as no classification and proceed unchanged.
+ *
+ * The result sharpens the orchestrator system prompt; it does not gate the
+ * run. The approval card remains the human checkpoint regardless of intent.
+ */
+export async function classifySlackMentionIntent(
+  apiKey: string,
+  mentionText: string,
+  threadSummary: string,
+  fetchImpl: MentionFetchImpl = fetch,
+): Promise<SlackMentionIntentResult | null> {
+  const key = apiKey.trim();
+  if (!key || !mentionText.trim()) return null;
+  try {
+    const response = await fetchImpl(TYPESAFE_SYSTEMONE_URL_MENTION, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        state: {
+          mention: mentionText,
+          thread: threadSummary,
+        },
+        model: "jev-latest",
+        questions: {
+          intent: {
+            type: "choice",
+            instructions: "What is the user primarily asking the coding agent to do?",
+            criteria: {
+              fix: "Fix a bug, error, test failure, or broken behaviour",
+              implement: "Add a new feature, function, endpoint, or capability",
+              explain: "Explain, summarise, or document existing code or behaviour",
+              other: "Anything else: refactor, chore, question, or unclear",
+            },
+          },
+        },
+      }),
+    });
+    if (!response.ok) return null;
+    const body: unknown = await response.json();
+    const parsed = readChoiceBody(body);
+    if (!parsed) return null;
+    const intent = SLACK_INTENT_TYPES.includes(parsed.choice as SlackMentionIntent)
+      ? (parsed.choice as SlackMentionIntent)
+      : "other";
+    return { intent, probability: parsed.probability };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build a sharpened system-prompt hint from a TypeSafe intent classification.
+ * Returns an empty string when classification is absent so callers can append
+ * it without a branch.
+ */
+export function intentHint(classification: SlackMentionIntentResult | null): string {
+  if (!classification) return "";
+  const labels: Record<SlackMentionIntent, string> = {
+    fix: "The user wants you to fix a bug or broken behaviour.",
+    implement: "The user wants you to implement a new feature or capability.",
+    explain: "The user wants an explanation or documentation update.",
+    other: "",
+  };
+  return labels[classification.intent] ?? "";
+}
+
+
 export async function handleSlackEvent(
   body: SlackEventCallbackBody,
   env: Env,
